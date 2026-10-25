@@ -33,6 +33,7 @@ security and failure.
 [Configure discovery →](configuration/discovery.md)
 [Deploy and operate →](deployment/index.md)
 [Java API reference →](https://www.egothor.org/J7M/javadoc/)
+[Source code on GitHub →](https://github.com/Egothor/J7M)
 </section>
 
 <div class="j7m-home-capabilities" markdown>

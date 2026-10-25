@@ -1,5 +1,7 @@
 site_name: J7M Documentation
 site_url: https://www.egothor.org/J7M/
+repo_url: https://github.com/Egothor/J7M
+repo_name: Egothor/J7M
 site_description: Develop, configure and operate distributed Java applications with J7M. Annotated and
   explicit APIs, verified patterns and operational contracts.
 copyright: Copyright © 2026 Leo Galambos and the Egothor team
