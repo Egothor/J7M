@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">J7M connected nodes</title>
+  <rect width="64" height="64" rx="14" fill="#071a2c"/>
+  <path d="M14 44 32 13 50 44H14Z" fill="none" stroke="#32b7ff" stroke-width="3"/>
+  <circle cx="32" cy="13" r="7" fill="#efc45c"/>
+  <circle cx="14" cy="44" r="7" fill="#efc45c"/>
+  <circle cx="50" cy="44" r="7" fill="#efc45c"/>
+</svg>

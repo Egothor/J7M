@@ -1,0 +1,45 @@
+// Copyright (c) 2026, Leo Galambos and the Egothor team
+// https://www.egothor.org
+// SPDX-License-Identifier: BSD-4-Clause
+// Licensed under the BSD 4-Clause License; see LICENSE for the full terms.
+// This product includes software developed by Leo Galambos and the Egothor
+// team (https://www.egothor.org).
+
+plugins {
+    id "java-gradle-plugin"
+}
+
+gradlePlugin {
+    plugins {
+        j7mApplication {
+            id = "org.j7m.application"
+            implementationClass = "org.j7m.middleware.gradle.J7mApplicationPlugin"
+        }
+    }
+}
+
+dependencies {
+    implementation project(":j7m-api")
+    implementation project(":j7m-application-platform")
+    testImplementation project(":j7m-runtime")
+    testImplementation project(":j7m-transport-grpc")
+    testImplementation gradleTestKit()
+    testImplementation libs.junit.jupiter
+    testRuntimeOnly libs.junit.platform.launcher
+}
+
+def modularHelloApiJarTask = project(":examples:modular-hello-api").tasks.named("jar", Jar)
+def modularHelloImplJarTask = project(":examples:modular-hello-impl").tasks.named("jar", Jar)
+def modularHelloApiJar = modularHelloApiJarTask.flatMap { Jar task -> task.archiveFile }
+def modularHelloImplJar = modularHelloImplJarTask.flatMap { Jar task -> task.archiveFile }
+
+tasks.named("test", Test) { Test task ->
+    task.dependsOn modularHelloApiJarTask
+    task.dependsOn modularHelloImplJarTask
+    task.inputs.file(modularHelloApiJar).withPropertyName("modularHelloApiJar")
+    task.inputs.file(modularHelloImplJar).withPropertyName("modularHelloImplJar")
+    task.doFirst {
+        task.systemProperty "j7m.test.modularHelloApiJar", modularHelloApiJar.get().asFile.absolutePath
+        task.systemProperty "j7m.test.modularHelloImplJar", modularHelloImplJar.get().asFile.absolutePath
+    }
+}

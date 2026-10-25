@@ -1,0 +1,6 @@
+{
+  "algorithm": "SHA-256-local-fixture",
+  "signerId": "j7m-example-fixture",
+  "keyMaterialIncluded": false,
+  "certificationClaim": false
+}

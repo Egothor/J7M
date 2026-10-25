@@ -1,0 +1,3642 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://j7m.local/schema/nugget-admin-contract.schema.json",
+  "title": "J7M Nugget Admin Contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "formatName",
+    "formatVersion",
+    "protocolVersion",
+    "requestId",
+    "correlationId",
+    "operationKind",
+    "payloadType",
+    "payload"
+  ],
+  "properties": {
+    "formatName": {
+      "const": "j7m-nugget-admin-json"
+    },
+    "formatVersion": {
+      "const": 1
+    },
+    "protocolVersion": {
+      "const": 1
+    },
+    "requestId": {
+      "$ref": "#/$defs/token"
+    },
+    "correlationId": {
+      "$ref": "#/$defs/token"
+    },
+    "operationKind": {
+      "$ref": "#/$defs/operationKind"
+    },
+    "payloadType": {
+      "$ref": "#/$defs/payloadType"
+    },
+    "target": {
+      "$ref": "#/$defs/target"
+    },
+    "context": {
+      "$ref": "#/$defs/requestContext"
+    },
+    "outcome": {
+      "$ref": "#/$defs/adminOutcome"
+    },
+    "header": {
+      "$ref": "#/$defs/resultHeader"
+    },
+    "payload": {
+      "type": [
+        "object",
+        "null"
+      ]
+    }
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/capabilitiesRequestEnvelope"
+    },
+    {
+      "$ref": "#/$defs/capabilitiesResultEnvelope"
+    },
+    {
+      "$ref": "#/$defs/discoveryQueryRequestEnvelope"
+    },
+    {
+      "$ref": "#/$defs/discoverySelectorRequestEnvelope"
+    },
+    {
+      "$ref": "#/$defs/discoveryResultEnvelope"
+    },
+    {
+      "$ref": "#/$defs/discoveryResolutionEnvelope"
+    },
+    {
+      "$ref": "#/$defs/discoveryStatusSummaryEnvelope"
+    },
+    {
+      "$ref": "#/$defs/authenticationRequestEnvelope"
+    },
+    {
+      "$ref": "#/$defs/authenticationResultEnvelope"
+    },
+    {
+      "$ref": "#/$defs/introspectionRequestEnvelope"
+    },
+    {
+      "$ref": "#/$defs/introspectionQueryEnvelope"
+    },
+    {
+      "$ref": "#/$defs/introspectionDiskQueryEnvelope"
+    },
+    {
+      "$ref": "#/$defs/introspectionRecentErrorQueryEnvelope"
+    },
+    {
+      "$ref": "#/$defs/adminQueryEnvelope"
+    },
+    {
+      "$ref": "#/$defs/nuggetStatusEnvelope"
+    },
+    {
+      "$ref": "#/$defs/introspectionResultEnvelope"
+    },
+    {
+      "$ref": "#/$defs/applicationLifecycleRequestEnvelope"
+    },
+    {
+      "$ref": "#/$defs/applicationLifecycleResultEnvelope"
+    },
+    {
+      "$ref": "#/$defs/nuggetControlRequestEnvelope"
+    },
+    {
+      "$ref": "#/$defs/nuggetControlResultEnvelope"
+    },
+    {
+      "$ref": "#/$defs/unavailableNullPayloadEnvelope"
+    }
+  ],
+  "$defs": {
+    "token": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._:/-]+$"
+    },
+    "optionalToken": {
+      "type": "string",
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._:/-]*$"
+    },
+    "text": {
+      "type": "string",
+      "maxLength": 512,
+      "pattern": "^[^<>\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+    },
+    "instant": {
+      "type": "string",
+      "format": "date-time",
+      "maxLength": 64
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "maxLength": 256,
+        "pattern": "^(?!.*(?i:pin|admission|credential|password|passwd|secret|token|bearer|cookie|session|private|stack|exception|throwable|payload|configuration|challenge|oauth|path|manifest|certificate|signature|key|implementation))[^<>\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+      },
+      "maxProperties": 16,
+      "propertyNames": {
+        "type": "string",
+        "maxLength": 64,
+        "pattern": "^(?!.*(?i:pin|admission|credential|password|passwd|secret|token|bearer|cookie|session|private|stack|exception|throwable|payload|configuration|challenge|oauth|path|manifest|certificate|signature|key|implementation))[A-Za-z0-9._:-]+$"
+      }
+    },
+    "operationKind": {
+      "enum": [
+        "CAPABILITIES",
+        "DISCOVERY",
+        "AUTHENTICATION",
+        "INTROSPECTION",
+        "APPLICATION_LIFECYCLE",
+        "NUGGET_CONTROL"
+      ]
+    },
+    "adminOutcome": {
+      "enum": [
+        "ACCEPTED",
+        "IN_PROGRESS",
+        "COMPLETED",
+        "DENIED",
+        "UNAVAILABLE",
+        "TIMED_OUT",
+        "PARTIAL",
+        "OUTCOME_UNKNOWN"
+      ]
+    },
+    "payloadType": {
+      "enum": [
+        "",
+        "nugget-admin-capabilities",
+        "nugget-discovery-query",
+        "nugget-discovery-selector",
+        "nugget-discovery-result",
+        "nugget-discovery-resolution",
+        "nugget-discovery-status-summary",
+        "nugget-authentication-request",
+        "nugget-authentication-result",
+        "nugget-introspection-request",
+        "nugget-introspection-query",
+        "nugget-introspection-disk-query",
+        "nugget-introspection-recent-error-query",
+        "nugget-admin-query",
+        "nugget-status",
+        "nugget-introspection-result",
+        "nugget-application-lifecycle-request",
+        "nugget-application-lifecycle-result",
+        "nugget-control-request",
+        "nugget-control-result"
+      ]
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "nuggetId",
+        "runtimeId",
+        "generation"
+      ],
+      "properties": {
+        "nuggetId": {
+          "$ref": "#/$defs/token"
+        },
+        "runtimeId": {
+          "$ref": "#/$defs/token"
+        },
+        "generation": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        },
+        "endpointIdentity": {
+          "$ref": "#/$defs/optionalToken"
+        },
+        "providerIdentity": {
+          "$ref": "#/$defs/optionalToken"
+        }
+      }
+    },
+    "requestContext": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "requestedAt",
+        "clientBudgetMillis",
+        "metadata"
+      ],
+      "properties": {
+        "requestedAt": {
+          "$ref": "#/$defs/instant"
+        },
+        "clientBudgetMillis": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 300000
+        },
+        "clientDeadlineAt": {
+          "$ref": "#/$defs/instant"
+        },
+        "metadata": {
+          "$ref": "#/$defs/metadata"
+        }
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "maxItems": 16,
+      "items": {
+        "type": "string",
+        "maxLength": 160,
+        "pattern": "^(?!.*(?i:pin|admission|credential|password|passwd|secret|token|bearer|cookie|session|private|stack|exception|throwable|payload|configuration|challenge|oauth|path|manifest|certificate|signature|key|implementation))[^<>\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+      }
+    },
+    "publicError": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "code",
+        "message",
+        "retryable",
+        "dirtyTarget",
+        "details"
+      ],
+      "properties": {
+        "code": {
+          "enum": [
+            "NOT_FOUND",
+            "UNAVAILABLE",
+            "DEADLINE_EXCEEDED",
+            "CANCELLED",
+            "OVERLOADED",
+            "PERMISSION_DENIED",
+            "UNAUTHENTICATED",
+            "INVALID_ARGUMENT",
+            "METHOD_NOT_FOUND",
+            "INTERFACE_MISMATCH",
+            "CODEC_ERROR",
+            "REMOTE_EXCEPTION",
+            "LEASE_EXPIRED",
+            "DUPLICATE_OPERATION",
+            "STALE_FENCING_TOKEN",
+            "REGISTRY_UNAVAILABLE",
+            "TRANSPORT_ERROR",
+            "LOG_CORRUPTION",
+            "DURABLE_LOG_ERROR",
+            "RECOVERY_FAILED",
+            "INTERNAL"
+          ]
+        },
+        "message": {
+          "$ref": "#/$defs/text"
+        },
+        "retryable": {
+          "type": "boolean"
+        },
+        "dirtyTarget": {
+          "type": "boolean"
+        },
+        "details": {
+          "$ref": "#/$defs/metadata"
+        }
+      }
+    },
+    "resultHeader": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "formatName",
+        "formatVersion",
+        "protocolVersion",
+        "requestId",
+        "correlationId",
+        "operationKind",
+        "outcome",
+        "accepted",
+        "inProgress",
+        "completed",
+        "denied",
+        "unavailable",
+        "timedOut",
+        "partial",
+        "outcomeUnknown",
+        "returnedCount",
+        "totalAvailable",
+        "truncated",
+        "warnings",
+        "requestedAt",
+        "completedAt",
+        "elapsedMillis",
+        "metadata"
+      ],
+      "properties": {
+        "formatName": {
+          "const": "j7m-nugget-admin-json"
+        },
+        "formatVersion": {
+          "const": 1
+        },
+        "protocolVersion": {
+          "const": 1
+        },
+        "requestId": {
+          "$ref": "#/$defs/token"
+        },
+        "correlationId": {
+          "$ref": "#/$defs/token"
+        },
+        "operationKind": {
+          "$ref": "#/$defs/operationKind"
+        },
+        "operationId": {
+          "$ref": "#/$defs/optionalToken"
+        },
+        "outcome": {
+          "$ref": "#/$defs/adminOutcome"
+        },
+        "accepted": {
+          "type": "boolean"
+        },
+        "inProgress": {
+          "type": "boolean"
+        },
+        "completed": {
+          "type": "boolean"
+        },
+        "denied": {
+          "type": "boolean"
+        },
+        "unavailable": {
+          "type": "boolean"
+        },
+        "timedOut": {
+          "type": "boolean"
+        },
+        "partial": {
+          "type": "boolean"
+        },
+        "outcomeUnknown": {
+          "type": "boolean"
+        },
+        "returnedCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 500
+        },
+        "totalAvailable": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        },
+        "truncated": {
+          "type": "boolean"
+        },
+        "warnings": {
+          "$ref": "#/$defs/warnings"
+        },
+        "error": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/publicError"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "requestedAt": {
+          "$ref": "#/$defs/instant"
+        },
+        "completedAt": {
+          "$ref": "#/$defs/instant"
+        },
+        "elapsedMillis": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        },
+        "metadata": {
+          "$ref": "#/$defs/metadata"
+        }
+      }
+    },
+    "queryFilter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "field",
+        "value"
+      ],
+      "properties": {
+        "field": {
+          "enum": [
+            "STABLE_ID",
+            "NUGGET_ID",
+            "RUNTIME_ID",
+            "GENERATION",
+            "APPLICATION_ID",
+            "COORDINATE",
+            "INSTANCE_ID",
+            "OBJECT_ID",
+            "OBJECT_KIND",
+            "SERVICE_NAME",
+            "VISIBILITY",
+            "STATE",
+            "HEALTH",
+            "READINESS",
+            "TRANSPORT_ID",
+            "ROLE",
+            "ROOT_ID",
+            "TIMESTAMP"
+          ]
+        },
+        "value": {
+          "$ref": "#/$defs/text"
+        }
+      }
+    },
+    "querySort": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "field",
+        "direction"
+      ],
+      "properties": {
+        "field": {
+          "enum": [
+            "STABLE_ID",
+            "NUGGET_ID",
+            "RUNTIME_ID",
+            "GENERATION",
+            "APPLICATION_ID",
+            "COORDINATE",
+            "INSTANCE_ID",
+            "OBJECT_ID",
+            "OBJECT_KIND",
+            "SERVICE_NAME",
+            "VISIBILITY",
+            "STATE",
+            "HEALTH",
+            "READINESS",
+            "TRANSPORT_ID",
+            "ROLE",
+            "ROOT_ID",
+            "TIMESTAMP"
+          ]
+        },
+        "direction": {
+          "enum": [
+            "ASC",
+            "DESC"
+          ]
+        }
+      }
+    },
+    "adminQuery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "offset",
+        "limit",
+        "filters",
+        "sorts"
+      ],
+      "properties": {
+        "offset": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 500
+        },
+        "filters": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "$ref": "#/$defs/queryFilter"
+          }
+        },
+        "sorts": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 5,
+          "items": {
+            "$ref": "#/$defs/querySort"
+          }
+        },
+        "continuation": {
+          "$ref": "#/$defs/optionalToken"
+        }
+      }
+    },
+    "page": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "offset",
+        "limit",
+        "returned",
+        "totalAvailable",
+        "partial",
+        "truncated"
+      ],
+      "properties": {
+        "offset": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 500
+        },
+        "returned": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 500
+        },
+        "totalAvailable": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        },
+        "totalAvailableAuthorized": {
+          "type": "boolean"
+        },
+        "partial": {
+          "type": "boolean"
+        },
+        "truncated": {
+          "type": "boolean"
+        },
+        "continuation": {
+          "$ref": "#/$defs/optionalToken"
+        }
+      }
+    },
+    "capabilitiesResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "available",
+        "protocolVersion",
+        "jsonFormatName",
+        "jsonFormatVersion",
+        "capabilities",
+        "operationKinds",
+        "maxPageLimit",
+        "maxMetadataEntries",
+        "collectedAt",
+        "metadata"
+      ],
+      "properties": {
+        "available": {
+          "type": "boolean"
+        },
+        "protocolVersion": {
+          "const": 1
+        },
+        "jsonFormatName": {
+          "const": "j7m-nugget-admin-json"
+        },
+        "jsonFormatVersion": {
+          "const": 1
+        },
+        "capabilities": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "type": "string",
+            "maxLength": 64
+          }
+        },
+        "operationKinds": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "$ref": "#/$defs/operationKind"
+          }
+        },
+        "maxPageLimit": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 500
+        },
+        "maxMetadataEntries": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 16
+        },
+        "collectedAt": {
+          "$ref": "#/$defs/instant"
+        },
+        "metadata": {
+          "$ref": "#/$defs/metadata"
+        }
+      }
+    },
+    "discoveryQueryRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "includeStale",
+        "limit",
+        "correlationId"
+      ],
+      "properties": {
+        "includeStale": {
+          "type": "boolean"
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 256
+        },
+        "correlationId": {
+          "$ref": "#/$defs/optionalToken"
+        }
+      }
+    },
+    "discoverySelectorRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "value",
+        "correlationId"
+      ],
+      "properties": {
+        "type": {
+          "enum": [
+            "EXACT_ID",
+            "EXACT_NAME",
+            "ALL",
+            "ENDPOINT_ID"
+          ]
+        },
+        "value": {
+          "$ref": "#/$defs/text"
+        },
+        "correlationId": {
+          "$ref": "#/$defs/optionalToken"
+        }
+      }
+    },
+    "endpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "transport",
+        "scheme",
+        "host",
+        "port",
+        "localId"
+      ],
+      "properties": {
+        "transport": {
+          "$ref": "#/$defs/token"
+        },
+        "scheme": {
+          "$ref": "#/$defs/token"
+        },
+        "host": {
+          "$ref": "#/$defs/text"
+        },
+        "port": {
+          "type": "integer",
+          "minimum": -1,
+          "maximum": 65535
+        },
+        "localId": {
+          "$ref": "#/$defs/optionalToken"
+        }
+      }
+    },
+    "discoveryRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "nuggetId",
+        "nuggetName",
+        "runtimeId",
+        "endpoint",
+        "protocolMinimum",
+        "protocolMaximum",
+        "compatibility",
+        "capabilities",
+        "processId",
+        "hostSummary",
+        "startedAt",
+        "lastSeenAt",
+        "expiresAt",
+        "source",
+        "status",
+        "warnings"
+      ],
+      "properties": {
+        "nuggetId": {
+          "$ref": "#/$defs/optionalToken"
+        },
+        "nuggetName": {
+          "$ref": "#/$defs/text"
+        },
+        "runtimeId": {
+          "$ref": "#/$defs/optionalToken"
+        },
+        "endpoint": {
+          "$ref": "#/$defs/endpoint"
+        },
+        "protocolMinimum": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "protocolMaximum": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "compatibility": {
+          "enum": [
+            "COMPATIBLE",
+            "INCOMPATIBLE",
+            "UNKNOWN"
+          ]
+        },
+        "capabilities": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "$ref": "#/$defs/text"
+          }
+        },
+        "processId": {
+          "$ref": "#/$defs/optionalToken"
+        },
+        "hostSummary": {
+          "$ref": "#/$defs/optionalToken"
+        },
+        "startedAt": {
+          "$ref": "#/$defs/instant"
+        },
+        "lastSeenAt": {
+          "$ref": "#/$defs/instant"
+        },
+        "expiresAt": {
+          "$ref": "#/$defs/instant"
+        },
+        "source": {
+          "enum": [
+            "LOCAL_RECORD",
+            "CONFIGURED_TARGET",
+            "FIRST_PARTY_REGISTRY",
+            "MULTICAST_BOOTSTRAP",
+            "UNKNOWN"
+          ]
+        },
+        "status": {
+          "enum": [
+            "ACTIVE",
+            "STALE",
+            "CONFLICTED",
+            "UNRESOLVED",
+            "UNKNOWN"
+          ]
+        },
+        "warnings": {
+          "$ref": "#/$defs/warnings"
+        }
+      }
+    },
+    "discoveryResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "records",
+        "returned",
+        "totalAvailable",
+        "collectedAt",
+        "partial",
+        "warnings"
+      ],
+      "properties": {
+        "records": {
+          "type": "array",
+          "maxItems": 256,
+          "items": {
+            "$ref": "#/$defs/discoveryRecord"
+          }
+        },
+        "returned": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 256
+        },
+        "totalAvailable": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        },
+        "collectedAt": {
+          "$ref": "#/$defs/instant"
+        },
+        "partial": {
+          "type": "boolean"
+        },
+        "warnings": {
+          "$ref": "#/$defs/warnings"
+        }
+      }
+    },
+    "discoveryResolution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "records",
+        "safeReason",
+        "resolvedAt",
+        "warnings"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "RESOLVED",
+            "NOT_FOUND",
+            "AMBIGUOUS",
+            "STALE",
+            "INCOMPATIBLE",
+            "UNRESOLVED",
+            "CONFLICTED"
+          ]
+        },
+        "records": {
+          "type": "array",
+          "maxItems": 256,
+          "items": {
+            "$ref": "#/$defs/discoveryRecord"
+          }
+        },
+        "safeReason": {
+          "$ref": "#/$defs/optionalToken"
+        },
+        "errorCode": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 64,
+          "pattern": "^[A-Z0-9_]*$"
+        },
+        "resolvedAt": {
+          "$ref": "#/$defs/instant"
+        },
+        "warnings": {
+          "$ref": "#/$defs/warnings"
+        }
+      }
+    },
+    "discoveryStatusSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "localPublicationEnabled",
+        "configuredTargetCount",
+        "lastPublicationAt",
+        "lastScanAt",
+        "activeRecordCount",
+        "metadata"
+      ],
+      "properties": {
+        "localPublicationEnabled": {
+          "type": "boolean"
+        },
+        "configuredTargetCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        },
+        "lastPublicationAt": {
+          "$ref": "#/$defs/instant"
+        },
+        "lastScanAt": {
+          "$ref": "#/$defs/instant"
+        },
+        "activeRecordCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        },
+        "metadata": {
+          "$ref": "#/$defs/metadata"
+        }
+      }
+    },
+    "authenticationRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "correlationId",
+        "source",
+        "sourceId",
+        "trustedSource",
+        "requestedAt"
+      ],
+      "properties": {
+        "correlationId": {
+          "$ref": "#/$defs/token"
+        },
+        "source": {
+          "enum": [
+            "LOCAL",
+            "REMOTE",
+            "UNKNOWN"
+          ]
+        },
+        "sourceId": {
+          "$ref": "#/$defs/optionalToken"
+        },
+        "trustedSource": {
+          "type": "boolean"
+        },
+        "requestedAt": {
+          "$ref": "#/$defs/instant"
+        }
+      }
+    },
+    "authenticationResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "outcome",
+        "failureReason",
+        "nuggetId",
+        "correlationId",
+        "retryAfterMillis",
+        "timestamp",
+        "metadata"
+      ],
+      "properties": {
+        "outcome": {
+          "enum": [
+            "ACCEPTED",
+            "REJECTED",
+            "THROTTLED",
+            "UNAVAILABLE",
+            "INVALID_REQUEST"
+          ]
+        },
+        "failureReason": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "nuggetId": {
+          "$ref": "#/$defs/optionalToken"
+        },
+        "correlationId": {
+          "$ref": "#/$defs/optionalToken"
+        },
+        "admissionAccepted": {
+          "type": "boolean"
+        },
+        "retryAfterMillis": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        },
+        "timestamp": {
+          "$ref": "#/$defs/instant"
+        },
+        "error": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/publicError"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "metadata": {
+          "$ref": "#/$defs/metadata"
+        }
+      }
+    },
+    "introspectionRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "correlationId",
+        "requestedAt",
+        "metadata"
+      ],
+      "properties": {
+        "correlationId": {
+          "$ref": "#/$defs/optionalToken"
+        },
+        "requestedAt": {
+          "$ref": "#/$defs/instant"
+        },
+        "metadata": {
+          "$ref": "#/$defs/metadata"
+        }
+      }
+    },
+    "introspectionQuery": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/adminQuery"
+        }
+      ]
+    },
+    "introspectionDiskQuery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role",
+        "page"
+      ],
+      "properties": {
+        "role": {
+          "$ref": "#/$defs/optionalToken"
+        },
+        "page": {
+          "$ref": "#/$defs/adminQuery"
+        }
+      }
+    },
+    "introspectionRecentErrorQuery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "component",
+        "page"
+      ],
+      "properties": {
+        "component": {
+          "$ref": "#/$defs/optionalToken"
+        },
+        "page": {
+          "$ref": "#/$defs/adminQuery"
+        }
+      }
+    },
+    "nuggetStatus": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "identity",
+        "configuration",
+        "statusAt",
+        "metadata"
+      ],
+      "properties": {
+        "identity": {
+          "$ref": "#/$defs/nuggetInfo"
+        },
+        "configuration": {
+          "$ref": "#/$defs/configurationInfo"
+        },
+        "statusAt": {
+          "$ref": "#/$defs/instant"
+        },
+        "metadata": {
+          "$ref": "#/$defs/metadata"
+        }
+      }
+    },
+    "nuggetInfo": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "nuggetId",
+        "nuggetName",
+        "runtimeId",
+        "runtimeIdentity",
+        "startedAt",
+        "processId",
+        "hostSummary",
+        "j7mVersion",
+        "jvmVersion",
+        "state",
+        "capabilities",
+        "metadata"
+      ],
+      "properties": {
+        "nuggetId": {
+          "$ref": "#/$defs/token"
+        },
+        "nuggetName": {
+          "$ref": "#/$defs/text"
+        },
+        "runtimeId": {
+          "$ref": "#/$defs/token"
+        },
+        "runtimeIdentity": {
+          "$ref": "#/$defs/runtimeIdentity"
+        },
+        "startedAt": {
+          "$ref": "#/$defs/instant"
+        },
+        "processId": {
+          "$ref": "#/$defs/optionalToken"
+        },
+        "hostSummary": {
+          "$ref": "#/$defs/text"
+        },
+        "j7mVersion": {
+          "$ref": "#/$defs/optionalToken"
+        },
+        "jvmVersion": {
+          "$ref": "#/$defs/text"
+        },
+        "state": {
+          "enum": [
+            "STARTING",
+            "RUNNING",
+            "DEGRADED",
+            "DRAINING",
+            "STOPPING",
+            "STOPPED",
+            "UNKNOWN"
+          ]
+        },
+        "capabilities": {
+          "$ref": "#/$defs/metadata"
+        },
+        "metadata": {
+          "$ref": "#/$defs/metadata"
+        }
+      }
+    },
+    "configurationInfo": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "adminState",
+        "adminEnabled",
+        "unsafeDeveloperMode",
+        "pinSourceType",
+        "lowerSafetyPinSource",
+        "verifierFormat",
+        "metadata"
+      ],
+      "properties": {
+        "adminState": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "adminEnabled": {
+          "type": "boolean"
+        },
+        "unsafeDeveloperMode": {
+          "type": "boolean"
+        },
+        "pinSourceType": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "lowerSafetyPinSource": {
+          "type": "boolean"
+        },
+        "verifierFormat": {
+          "$ref": "#/$defs/optionalToken"
+        },
+        "metadata": {
+          "$ref": "#/$defs/metadata"
+        }
+      }
+    },
+    "nonNegativeLong": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9223372036854775807
+    },
+    "signedLong": {
+      "type": "integer",
+      "minimum": -9223372036854775808,
+      "maximum": 9223372036854775807
+    },
+    "nonNegativeInteger": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 2147483647
+    },
+    "signedDouble": {
+      "type": "number",
+      "minimum": -9223372036854775808,
+      "maximum": 9223372036854775807
+    },
+    "applicationRunState": {
+      "enum": [
+        "PACKAGED",
+        "VERIFIED",
+        "DEPLOYED",
+        "PLANNED",
+        "LOADING",
+        "LOADED",
+        "STARTING",
+        "RUNNING",
+        "UPGRADING",
+        "ROLLING_BACK",
+        "DRAINING",
+        "STOPPING",
+        "STOPPED",
+        "UNLOADING",
+        "UNLOADED",
+        "FAILED",
+        "REJECTED"
+      ]
+    },
+    "nuggetState": {
+      "enum": [
+        "STARTING",
+        "RUNNING",
+        "DEGRADED",
+        "DRAINING",
+        "STOPPING",
+        "STOPPED",
+        "UNKNOWN"
+      ]
+    },
+    "availability": {
+      "enum": [
+        "AVAILABLE",
+        "PARTIAL",
+        "UNAVAILABLE",
+        "NOT_CONFIGURED",
+        "UNKNOWN"
+      ]
+    },
+    "healthState": {
+      "enum": [
+        "HEALTHY",
+        "DEGRADED",
+        "UNHEALTHY",
+        "UNKNOWN"
+      ]
+    },
+    "readinessState": {
+      "enum": [
+        "READY",
+        "NOT_READY",
+        "DEGRADED",
+        "UNKNOWN"
+      ]
+    },
+    "diskHealth": {
+      "enum": [
+        "HEALTHY",
+        "DEGRADED",
+        "UNHEALTHY",
+        "UNKNOWN"
+      ]
+    },
+    "objectVisibility": {
+      "enum": [
+        "EXPORTED",
+        "INTERNAL",
+        "PRIVATE"
+      ]
+    },
+    "sortDirection": {
+      "enum": [
+        "ASC",
+        "DESC"
+      ]
+    },
+    "middlewareErrorCode": {
+      "$ref": "#/$defs/publicError/properties/code"
+    },
+    "textList": {
+      "type": "array",
+      "maxItems": 500,
+      "items": {
+        "$ref": "#/$defs/text"
+      }
+    },
+    "shortTextList": {
+      "type": "array",
+      "maxItems": 32,
+      "items": {
+        "$ref": "#/$defs/text"
+      }
+    },
+    "metadataLong": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/nonNegativeLong"
+      },
+      "maxProperties": 16,
+      "propertyNames": {
+        "$ref": "#/$defs/token"
+      }
+    },
+    "inspectionSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "category",
+        "page",
+        "items",
+        "metadata"
+      ],
+      "properties": {
+        "category": {
+          "enum": [
+            "OVERVIEW",
+            "ENVIRONMENT",
+            "DISK",
+            "HEALTH",
+            "READINESS",
+            "RUNTIME",
+            "TRANSPORTS",
+            "REGISTRY",
+            "REPOSITORY",
+            "APPLICATIONS",
+            "OBJECTS",
+            "METRICS",
+            "ERRORS"
+          ]
+        },
+        "page": {
+          "$ref": "#/$defs/page"
+        },
+        "items": {
+          "type": "array",
+          "maxItems": 500,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/optionalToken"
+              },
+              "name": {
+                "$ref": "#/$defs/text"
+              },
+              "state": {
+                "$ref": "#/$defs/text"
+              },
+              "health": {
+                "$ref": "#/$defs/text"
+              },
+              "readiness": {
+                "$ref": "#/$defs/text"
+              },
+              "role": {
+                "$ref": "#/$defs/text"
+              },
+              "unit": {
+                "$ref": "#/$defs/text"
+              },
+              "value": {
+                "oneOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 512,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+                  },
+                  {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 9223372036854775807
+                  },
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "metadata": {
+                "$ref": "#/$defs/metadata"
+              }
+            }
+          }
+        },
+        "metadata": {
+          "$ref": "#/$defs/metadata"
+        }
+      }
+    },
+    "introspectionValue": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/text"
+        },
+        {
+          "$ref": "#/$defs/nonNegativeLong"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/inspectionSummary"
+        },
+        {
+          "$ref": "#/$defs/introspectionCollectionResult"
+        },
+        {
+          "$ref": "#/$defs/introspectionOverview"
+        },
+        {
+          "$ref": "#/$defs/environmentSummary"
+        },
+        {
+          "$ref": "#/$defs/diskVolumeSummary"
+        },
+        {
+          "$ref": "#/$defs/healthSummary"
+        },
+        {
+          "$ref": "#/$defs/readinessSummary"
+        },
+        {
+          "$ref": "#/$defs/runtimeSummary"
+        },
+        {
+          "$ref": "#/$defs/transportSummary"
+        },
+        {
+          "$ref": "#/$defs/registrySummary"
+        },
+        {
+          "$ref": "#/$defs/repositorySummary"
+        },
+        {
+          "$ref": "#/$defs/applicationSummary"
+        },
+        {
+          "$ref": "#/$defs/applicationDetail"
+        },
+        {
+          "$ref": "#/$defs/objectSummary"
+        },
+        {
+          "$ref": "#/$defs/objectDetail"
+        },
+        {
+          "$ref": "#/$defs/serviceSummary"
+        },
+        {
+          "$ref": "#/$defs/recentErrorEntry"
+        },
+        {
+          "$ref": "#/$defs/metricsSummary"
+        },
+        {
+          "$ref": "#/$defs/metricEntry"
+        },
+        {
+          "$ref": "#/$defs/keyValue"
+        }
+      ]
+    },
+    "introspectionCollectionResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "items",
+        "offset",
+        "limit",
+        "returned",
+        "totalAvailable",
+        "totalAvailableAuthorized",
+        "sortedBy",
+        "direction",
+        "filters",
+        "collectedAt",
+        "partial",
+        "metadata"
+      ],
+      "properties": {
+        "items": {
+          "type": "array",
+          "maxItems": 500,
+          "items": {
+            "$ref": "#/$defs/introspectionValue"
+          }
+        },
+        "offset": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 500
+        },
+        "returned": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 500
+        },
+        "totalAvailable": {
+          "$ref": "#/$defs/nonNegativeLong"
+        },
+        "totalAvailableAuthorized": {
+          "type": "boolean"
+        },
+        "sortedBy": {
+          "$ref": "#/$defs/token"
+        },
+        "direction": {
+          "$ref": "#/$defs/sortDirection"
+        },
+        "filters": {
+          "$ref": "#/$defs/metadata"
+        },
+        "collectedAt": {
+          "$ref": "#/$defs/instant"
+        },
+        "partial": {
+          "type": "boolean"
+        },
+        "metadata": {
+          "$ref": "#/$defs/metadata"
+        }
+      }
+    },
+    "componentSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "component",
+        "availability",
+        "health",
+        "readiness",
+        "required",
+        "safeReason",
+        "metadata"
+      ],
+      "properties": {
+        "component": {
+          "$ref": "#/$defs/token"
+        },
+        "availability": {
+          "$ref": "#/$defs/availability"
+        },
+        "health": {
+          "$ref": "#/$defs/healthState"
+        },
+        "readiness": {
+          "$ref": "#/$defs/readinessState"
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "safeReason": {
+          "$ref": "#/$defs/text"
+        },
+        "metadata": {
+          "$ref": "#/$defs/metadata"
+        }
+      }
+    },
+    "introspectionOverview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "runtime",
+        "health",
+        "readiness",
+        "partial",
+        "warnings"
+      ],
+      "properties": {
+        "status": {
+          "$ref": "#/$defs/nuggetStatus"
+        },
+        "runtime": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/runtimeSummary"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "health": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/healthSummary"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "readiness": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/readinessSummary"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "partial": {
+          "type": "boolean"
+        },
+        "warnings": {
+          "$ref": "#/$defs/warnings"
+        }
+      }
+    },
+    "environmentSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "jvmVersion",
+        "jvmVendor",
+        "vmName",
+        "osName",
+        "osVersion",
+        "architecture",
+        "processId",
+        "nuggetStartTime",
+        "processUptimeMillis",
+        "availableProcessors",
+        "heapUsedBytes",
+        "heapCommittedBytes",
+        "heapMaxBytes",
+        "nonHeapUsedBytes",
+        "nonHeapCommittedBytes",
+        "liveThreadCount",
+        "daemonThreadCount",
+        "peakThreadCount",
+        "totalStartedThreadCount",
+        "loadedClassCount",
+        "totalLoadedClassCount",
+        "garbageCollectors",
+        "processCpuLoad",
+        "systemCpuLoad",
+        "processCpuTimeNanos",
+        "workingDirectorySummary",
+        "environmentVariableNames",
+        "jvmArgumentSummaries",
+        "capabilities",
+        "collectedAt"
+      ],
+      "properties": {
+        "jvmVersion": {
+          "$ref": "#/$defs/text"
+        },
+        "jvmVendor": {
+          "$ref": "#/$defs/text"
+        },
+        "vmName": {
+          "$ref": "#/$defs/text"
+        },
+        "osName": {
+          "$ref": "#/$defs/text"
+        },
+        "osVersion": {
+          "$ref": "#/$defs/text"
+        },
+        "architecture": {
+          "$ref": "#/$defs/token"
+        },
+        "processId": {
+          "$ref": "#/$defs/optionalToken"
+        },
+        "nuggetStartTime": {
+          "$ref": "#/$defs/instant"
+        },
+        "processUptimeMillis": {
+          "$ref": "#/$defs/nonNegativeLong"
+        },
+        "availableProcessors": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "heapUsedBytes": {
+          "$ref": "#/$defs/nonNegativeLong"
+        },
+        "heapCommittedBytes": {
+          "$ref": "#/$defs/nonNegativeLong"
+        },
+        "heapMaxBytes": {
+          "$ref": "#/$defs/signedLong"
+        },
+        "nonHeapUsedBytes": {
+          "$ref": "#/$defs/nonNegativeLong"
+        },
+        "nonHeapCommittedBytes": {
+          "$ref": "#/$defs/nonNegativeLong"
+        },
+        "liveThreadCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "daemonThreadCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "peakThreadCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "totalStartedThreadCount": {
+          "$ref": "#/$defs/nonNegativeLong"
+        },
+        "loadedClassCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "totalLoadedClassCount": {
+          "$ref": "#/$defs/nonNegativeLong"
+        },
+        "garbageCollectors": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "$ref": "#/$defs/keyValue"
+          }
+        },
+        "processCpuLoad": {
+          "$ref": "#/$defs/signedDouble"
+        },
+        "systemCpuLoad": {
+          "$ref": "#/$defs/signedDouble"
+        },
+        "processCpuTimeNanos": {
+          "$ref": "#/$defs/signedLong"
+        },
+        "workingDirectorySummary": {
+          "$ref": "#/$defs/text"
+        },
+        "environmentVariableNames": {
+          "$ref": "#/$defs/textList"
+        },
+        "jvmArgumentSummaries": {
+          "type": "array",
+          "maxItems": 500,
+          "items": {
+            "$ref": "#/$defs/keyValue"
+          }
+        },
+        "capabilities": {
+          "$ref": "#/$defs/metadata"
+        },
+        "collectedAt": {
+          "$ref": "#/$defs/instant"
+        }
+      }
+    },
+    "diskVolumeSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rootId",
+        "role",
+        "roles",
+        "pathSummary",
+        "totalBytes",
+        "usableBytes",
+        "availableBytes",
+        "usedBytes",
+        "percentUsed",
+        "health",
+        "readOnly",
+        "availability",
+        "collectedAt",
+        "safeErrorCode",
+        "metadata"
+      ],
+      "properties": {
+        "rootId": {
+          "$ref": "#/$defs/token"
+        },
+        "role": {
+          "$ref": "#/$defs/token"
+        },
+        "roles": {
+          "$ref": "#/$defs/shortTextList"
+        },
+        "pathSummary": {
+          "$ref": "#/$defs/text"
+        },
+        "totalBytes": {
+          "$ref": "#/$defs/signedLong"
+        },
+        "usableBytes": {
+          "$ref": "#/$defs/signedLong"
+        },
+        "availableBytes": {
+          "$ref": "#/$defs/signedLong"
+        },
+        "usedBytes": {
+          "$ref": "#/$defs/signedLong"
+        },
+        "percentUsed": {
+          "$ref": "#/$defs/signedDouble"
+        },
+        "health": {
+          "$ref": "#/$defs/diskHealth"
+        },
+        "readOnly": {
+          "type": "boolean"
+        },
+        "availability": {
+          "$ref": "#/$defs/availability"
+        },
+        "collectedAt": {
+          "$ref": "#/$defs/instant"
+        },
+        "safeErrorCode": {
+          "$ref": "#/$defs/optionalToken"
+        },
+        "metadata": {
+          "$ref": "#/$defs/metadata"
+        }
+      }
+    },
+    "healthSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "components",
+        "collectedAt",
+        "partial"
+      ],
+      "properties": {
+        "state": {
+          "$ref": "#/$defs/healthState"
+        },
+        "components": {
+          "type": "array",
+          "maxItems": 500,
+          "items": {
+            "$ref": "#/$defs/componentSummary"
+          }
+        },
+        "collectedAt": {
+          "$ref": "#/$defs/instant"
+        },
+        "partial": {
+          "type": "boolean"
+        }
+      }
+    },
+    "readinessSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "components",
+        "collectedAt",
+        "partial"
+      ],
+      "properties": {
+        "state": {
+          "$ref": "#/$defs/readinessState"
+        },
+        "components": {
+          "type": "array",
+          "maxItems": 500,
+          "items": {
+            "$ref": "#/$defs/componentSummary"
+          }
+        },
+        "collectedAt": {
+          "$ref": "#/$defs/instant"
+        },
+        "partial": {
+          "type": "boolean"
+        }
+      }
+    },
+    "runtimeSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "runtimeId",
+        "nuggetId",
+        "lifecycleState",
+        "startTime",
+        "uptimeMillis",
+        "activeObjectCount",
+        "exportedObjectCount",
+        "hostedApplicationCount",
+        "invocationCount",
+        "invocationFailureCount",
+        "recentFailureCount",
+        "security",
+        "collectedAt"
+      ],
+      "properties": {
+        "runtimeId": {
+          "$ref": "#/$defs/optionalToken"
+        },
+        "nuggetId": {
+          "$ref": "#/$defs/optionalToken"
+        },
+        "lifecycleState": {
+          "$ref": "#/$defs/nuggetState"
+        },
+        "startTime": {
+          "$ref": "#/$defs/instant"
+        },
+        "uptimeMillis": {
+          "$ref": "#/$defs/nonNegativeLong"
+        },
+        "activeObjectCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "exportedObjectCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "hostedApplicationCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "invocationCount": {
+          "$ref": "#/$defs/nonNegativeLong"
+        },
+        "invocationFailureCount": {
+          "$ref": "#/$defs/nonNegativeLong"
+        },
+        "recentFailureCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "security": {
+          "$ref": "#/$defs/metadata"
+        },
+        "collectedAt": {
+          "$ref": "#/$defs/instant"
+        }
+      }
+    },
+    "transportSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "transportId",
+        "endpointSummary",
+        "running",
+        "metadata"
+      ],
+      "properties": {
+        "transportId": {
+          "$ref": "#/$defs/optionalToken"
+        },
+        "endpointSummary": {
+          "$ref": "#/$defs/text"
+        },
+        "running": {
+          "type": "boolean"
+        },
+        "metadata": {
+          "$ref": "#/$defs/metadata"
+        }
+      }
+    },
+    "registrySummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "recordCount",
+        "peerCount",
+        "multicastListenerRunning",
+        "bootstrapHintCount",
+        "lookupCacheSize",
+        "metrics",
+        "peerIds",
+        "recentEvents",
+        "collectedAt"
+      ],
+      "properties": {
+        "recordCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "peerCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "multicastListenerRunning": {
+          "type": "boolean"
+        },
+        "bootstrapHintCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "lookupCacheSize": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "metrics": {
+          "$ref": "#/$defs/metadataLong"
+        },
+        "peerIds": {
+          "$ref": "#/$defs/textList"
+        },
+        "recentEvents": {
+          "$ref": "#/$defs/textList"
+        },
+        "collectedAt": {
+          "$ref": "#/$defs/instant"
+        }
+      }
+    },
+    "repositorySummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rootSummary",
+        "artifactCount",
+        "promotionCount",
+        "metadata",
+        "collectedAt"
+      ],
+      "properties": {
+        "rootSummary": {
+          "$ref": "#/$defs/text"
+        },
+        "artifactCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "promotionCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "metadata": {
+          "$ref": "#/$defs/metadata"
+        },
+        "collectedAt": {
+          "$ref": "#/$defs/instant"
+        }
+      }
+    },
+    "applicationSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "applicationId",
+        "coordinate",
+        "instanceId",
+        "displayName",
+        "version",
+        "state",
+        "activationId",
+        "exportedServiceCount",
+        "health",
+        "readiness",
+        "lastSafeErrorCode",
+        "metadata"
+      ],
+      "properties": {
+        "applicationId": {
+          "$ref": "#/$defs/optionalToken"
+        },
+        "coordinate": {
+          "$ref": "#/$defs/optionalToken"
+        },
+        "instanceId": {
+          "$ref": "#/$defs/optionalToken"
+        },
+        "displayName": {
+          "$ref": "#/$defs/text"
+        },
+        "version": {
+          "$ref": "#/$defs/optionalToken"
+        },
+        "state": {
+          "$ref": "#/$defs/optionalToken"
+        },
+        "activationId": {
+          "$ref": "#/$defs/optionalToken"
+        },
+        "exportedServiceCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "health": {
+          "$ref": "#/$defs/healthState"
+        },
+        "readiness": {
+          "$ref": "#/$defs/readinessState"
+        },
+        "lastSafeErrorCode": {
+          "$ref": "#/$defs/optionalToken"
+        },
+        "metadata": {
+          "$ref": "#/$defs/metadata"
+        }
+      }
+    },
+    "applicationDetail": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "summary",
+        "declaredServices",
+        "moduleNames",
+        "capabilities",
+        "verificationStatus",
+        "signatureStatus",
+        "sbomStatus",
+        "provenanceStatus",
+        "auditCounters"
+      ],
+      "properties": {
+        "summary": {
+          "$ref": "#/$defs/applicationSummary"
+        },
+        "declaredServices": {
+          "type": "array",
+          "maxItems": 500,
+          "items": {
+            "$ref": "#/$defs/serviceSummary"
+          }
+        },
+        "moduleNames": {
+          "$ref": "#/$defs/textList"
+        },
+        "capabilities": {
+          "$ref": "#/$defs/metadata"
+        },
+        "verificationStatus": {
+          "$ref": "#/$defs/token"
+        },
+        "signatureStatus": {
+          "$ref": "#/$defs/token"
+        },
+        "sbomStatus": {
+          "$ref": "#/$defs/token"
+        },
+        "provenanceStatus": {
+          "$ref": "#/$defs/token"
+        },
+        "auditCounters": {
+          "$ref": "#/$defs/metadataLong"
+        }
+      }
+    },
+    "objectSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "nuggetId",
+        "objectId",
+        "logicalName",
+        "serviceName",
+        "kind",
+        "visibility",
+        "lifecycleState",
+        "registrationState",
+        "ownerApplication",
+        "interfaces",
+        "registryContext",
+        "local",
+        "endpointSummary",
+        "transportId",
+        "health",
+        "readiness",
+        "leaseExpiryMillis",
+        "generation",
+        "invocationCount",
+        "failureCount",
+        "lastInvocationTime",
+        "lastSafeErrorCode",
+        "sensitive",
+        "metadata"
+      ],
+      "properties": {
+        "nuggetId": {
+          "$ref": "#/$defs/optionalToken"
+        },
+        "objectId": {
+          "$ref": "#/$defs/optionalToken"
+        },
+        "logicalName": {
+          "$ref": "#/$defs/text"
+        },
+        "serviceName": {
+          "$ref": "#/$defs/text"
+        },
+        "kind": {
+          "$ref": "#/$defs/optionalToken"
+        },
+        "visibility": {
+          "$ref": "#/$defs/objectVisibility"
+        },
+        "lifecycleState": {
+          "$ref": "#/$defs/optionalToken"
+        },
+        "registrationState": {
+          "$ref": "#/$defs/optionalToken"
+        },
+        "ownerApplication": {
+          "$ref": "#/$defs/optionalToken"
+        },
+        "interfaces": {
+          "$ref": "#/$defs/textList"
+        },
+        "registryContext": {
+          "$ref": "#/$defs/token"
+        },
+        "local": {
+          "type": "boolean"
+        },
+        "endpointSummary": {
+          "$ref": "#/$defs/text"
+        },
+        "transportId": {
+          "$ref": "#/$defs/optionalToken"
+        },
+        "health": {
+          "$ref": "#/$defs/healthState"
+        },
+        "readiness": {
+          "$ref": "#/$defs/readinessState"
+        },
+        "leaseExpiryMillis": {
+          "$ref": "#/$defs/nonNegativeLong"
+        },
+        "generation": {
+          "$ref": "#/$defs/nonNegativeLong"
+        },
+        "invocationCount": {
+          "$ref": "#/$defs/nonNegativeLong"
+        },
+        "failureCount": {
+          "$ref": "#/$defs/nonNegativeLong"
+        },
+        "lastInvocationTime": {
+          "$ref": "#/$defs/instant"
+        },
+        "lastSafeErrorCode": {
+          "$ref": "#/$defs/optionalToken"
+        },
+        "sensitive": {
+          "type": "boolean"
+        },
+        "metadata": {
+          "$ref": "#/$defs/metadata"
+        }
+      }
+    },
+    "objectDetail": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "summary",
+        "descriptorMetadata",
+        "annotationMetadata"
+      ],
+      "properties": {
+        "summary": {
+          "$ref": "#/$defs/objectSummary"
+        },
+        "descriptorMetadata": {
+          "$ref": "#/$defs/metadata"
+        },
+        "annotationMetadata": {
+          "$ref": "#/$defs/metadata"
+        }
+      }
+    },
+    "serviceSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "serviceName",
+        "interfaceName",
+        "implementationSummary"
+      ],
+      "properties": {
+        "serviceName": {
+          "$ref": "#/$defs/text"
+        },
+        "interfaceName": {
+          "$ref": "#/$defs/text"
+        },
+        "implementationSummary": {
+          "$ref": "#/$defs/text"
+        }
+      }
+    },
+    "recentErrorEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "timestamp",
+        "correlationId",
+        "component",
+        "resourceSummary",
+        "errorCode",
+        "safeMessage",
+        "retryable",
+        "remoteRuntimeId",
+        "recurrenceCount",
+        "metadata"
+      ],
+      "properties": {
+        "timestamp": {
+          "$ref": "#/$defs/instant"
+        },
+        "correlationId": {
+          "$ref": "#/$defs/optionalToken"
+        },
+        "component": {
+          "$ref": "#/$defs/optionalToken"
+        },
+        "resourceSummary": {
+          "$ref": "#/$defs/text"
+        },
+        "errorCode": {
+          "$ref": "#/$defs/middlewareErrorCode"
+        },
+        "safeMessage": {
+          "$ref": "#/$defs/text"
+        },
+        "retryable": {
+          "type": "boolean"
+        },
+        "remoteRuntimeId": {
+          "$ref": "#/$defs/optionalToken"
+        },
+        "recurrenceCount": {
+          "$ref": "#/$defs/nonNegativeLong"
+        },
+        "metadata": {
+          "$ref": "#/$defs/metadata"
+        }
+      }
+    },
+    "metricsSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "metrics",
+        "collectedAt",
+        "partial"
+      ],
+      "properties": {
+        "metrics": {
+          "type": "array",
+          "maxItems": 500,
+          "items": {
+            "$ref": "#/$defs/metricEntry"
+          }
+        },
+        "collectedAt": {
+          "$ref": "#/$defs/instant"
+        },
+        "partial": {
+          "type": "boolean"
+        }
+      }
+    },
+    "metricEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "unit",
+        "value",
+        "labels"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/token"
+        },
+        "unit": {
+          "$ref": "#/$defs/token"
+        },
+        "value": {
+          "$ref": "#/$defs/signedDouble"
+        },
+        "labels": {
+          "$ref": "#/$defs/metadata"
+        }
+      }
+    },
+    "keyValue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key",
+        "value"
+      ],
+      "properties": {
+        "key": {
+          "$ref": "#/$defs/optionalToken"
+        },
+        "value": {
+          "$ref": "#/$defs/text"
+        }
+      }
+    },
+    "introspectionResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "admitted",
+        "authorized",
+        "category",
+        "collectedAt",
+        "partial",
+        "value",
+        "warnings",
+        "metadata"
+      ],
+      "properties": {
+        "admitted": {
+          "type": "boolean"
+        },
+        "authorized": {
+          "type": "boolean"
+        },
+        "category": {
+          "$ref": "#/$defs/inspectionSummary/properties/category"
+        },
+        "collectedAt": {
+          "$ref": "#/$defs/instant"
+        },
+        "partial": {
+          "type": "boolean"
+        },
+        "value": {
+          "$ref": "#/$defs/introspectionValue"
+        },
+        "error": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/publicError"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "warnings": {
+          "$ref": "#/$defs/warnings"
+        },
+        "metadata": {
+          "$ref": "#/$defs/metadata"
+        }
+      }
+    },
+    "applicationLifecycleRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "correlationId",
+        "action",
+        "dryRun",
+        "requestedAt",
+        "deadlineAt",
+        "metadata"
+      ],
+      "properties": {
+        "correlationId": {
+          "$ref": "#/$defs/optionalToken"
+        },
+        "action": {
+          "enum": [
+            "START",
+            "DRAIN",
+            "STOP",
+            "UNLOAD"
+          ]
+        },
+        "coordinate": {
+          "$ref": "#/$defs/optionalToken"
+        },
+        "instanceId": {
+          "$ref": "#/$defs/optionalToken"
+        },
+        "dryRun": {
+          "type": "boolean"
+        },
+        "requestedAt": {
+          "$ref": "#/$defs/instant"
+        },
+        "deadlineAt": {
+          "$ref": "#/$defs/instant"
+        },
+        "metadata": {
+          "$ref": "#/$defs/metadata"
+        }
+      }
+    },
+    "applicationId": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "group",
+        "name"
+      ],
+      "properties": {
+        "group": {
+          "$ref": "#/$defs/token"
+        },
+        "name": {
+          "$ref": "#/$defs/token"
+        }
+      }
+    },
+    "applicationVersion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "value"
+      ],
+      "properties": {
+        "value": {
+          "$ref": "#/$defs/token"
+        }
+      }
+    },
+    "applicationCoordinate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "version"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/applicationId"
+        },
+        "version": {
+          "$ref": "#/$defs/applicationVersion"
+        }
+      }
+    },
+    "applicationInstanceId": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "value"
+      ],
+      "properties": {
+        "value": {
+          "$ref": "#/$defs/token"
+        }
+      }
+    },
+    "activationIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "value"
+      ],
+      "properties": {
+        "value": {
+          "$ref": "#/$defs/token"
+        }
+      }
+    },
+    "runtimeIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "runtimeId",
+        "registryContext",
+        "metadata"
+      ],
+      "properties": {
+        "runtimeId": {
+          "$ref": "#/$defs/token"
+        },
+        "registryContext": {
+          "$ref": "#/$defs/token"
+        },
+        "metadata": {
+          "$ref": "#/$defs/metadata"
+        }
+      }
+    },
+    "applicationIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "coordinate",
+        "displayName",
+        "trustDomain"
+      ],
+      "properties": {
+        "coordinate": {
+          "$ref": "#/$defs/applicationCoordinate"
+        },
+        "displayName": {
+          "$ref": "#/$defs/text"
+        },
+        "trustDomain": {
+          "$ref": "#/$defs/token"
+        }
+      }
+    },
+    "applicationInstanceIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "instanceId",
+        "application",
+        "runtime",
+        "classLoaderMode"
+      ],
+      "properties": {
+        "instanceId": {
+          "$ref": "#/$defs/applicationInstanceId"
+        },
+        "application": {
+          "$ref": "#/$defs/applicationIdentity"
+        },
+        "runtime": {
+          "$ref": "#/$defs/runtimeIdentity"
+        },
+        "classLoaderMode": {
+          "$ref": "#/$defs/token"
+        }
+      }
+    },
+    "runtimeServiceIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "serviceName",
+        "interfaceName",
+        "implementationClass"
+      ],
+      "properties": {
+        "serviceName": {
+          "$ref": "#/$defs/text"
+        },
+        "interfaceName": {
+          "$ref": "#/$defs/text"
+        },
+        "implementationClass": {
+          "$ref": "#/$defs/text"
+        }
+      }
+    },
+    "applicationDeploymentPlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "coordinate",
+        "state",
+        "steps"
+      ],
+      "properties": {
+        "coordinate": {
+          "$ref": "#/$defs/applicationCoordinate"
+        },
+        "state": {
+          "$ref": "#/$defs/applicationRunState"
+        },
+        "steps": {
+          "$ref": "#/$defs/shortTextList"
+        }
+      }
+    },
+    "applicationDeploymentResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "success",
+        "state",
+        "message",
+        "details"
+      ],
+      "properties": {
+        "success": {
+          "type": "boolean"
+        },
+        "state": {
+          "$ref": "#/$defs/applicationRunState"
+        },
+        "message": {
+          "$ref": "#/$defs/text"
+        },
+        "details": {
+          "$ref": "#/$defs/shortTextList"
+        }
+      }
+    },
+    "applicationActivation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "activationIdentity",
+        "instanceIdentity",
+        "state",
+        "exportedServices",
+        "metadata"
+      ],
+      "properties": {
+        "activationIdentity": {
+          "$ref": "#/$defs/activationIdentity"
+        },
+        "instanceIdentity": {
+          "$ref": "#/$defs/applicationInstanceIdentity"
+        },
+        "state": {
+          "$ref": "#/$defs/applicationRunState"
+        },
+        "exportedServices": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "$ref": "#/$defs/runtimeServiceIdentity"
+          }
+        },
+        "metadata": {
+          "$ref": "#/$defs/metadata"
+        }
+      }
+    },
+    "applicationLifecycleResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operationId",
+        "correlationId",
+        "action",
+        "admitted",
+        "authorized",
+        "dryRun",
+        "nuggetId",
+        "runtimeId",
+        "coordinate",
+        "instanceId",
+        "previousState",
+        "currentState",
+        "resultingState",
+        "outcome",
+        "outcomeText",
+        "accepted",
+        "inProgress",
+        "completed",
+        "partial",
+        "outcomeUnknown",
+        "verificationSummary",
+        "authorizationSummary",
+        "plan",
+        "deploymentResult",
+        "activation",
+        "warnings",
+        "error",
+        "requestedAt",
+        "completedAt",
+        "elapsedMillis",
+        "metadata"
+      ],
+      "properties": {
+        "operationId": {
+          "$ref": "#/$defs/optionalToken"
+        },
+        "correlationId": {
+          "$ref": "#/$defs/optionalToken"
+        },
+        "action": {
+          "enum": [
+            "START",
+            "DRAIN",
+            "STOP",
+            "UNLOAD"
+          ]
+        },
+        "admitted": {
+          "type": "boolean"
+        },
+        "authorized": {
+          "type": "boolean"
+        },
+        "dryRun": {
+          "type": "boolean"
+        },
+        "nuggetId": {
+          "$ref": "#/$defs/optionalToken"
+        },
+        "runtimeId": {
+          "$ref": "#/$defs/optionalToken"
+        },
+        "coordinate": {
+          "$ref": "#/$defs/optionalToken"
+        },
+        "instanceId": {
+          "$ref": "#/$defs/optionalToken"
+        },
+        "previousState": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/applicationRunState"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "currentState": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/applicationRunState"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "resultingState": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/applicationRunState"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "outcome": {
+          "enum": [
+            "COMPLETED",
+            "DRY_RUN",
+            "ACCEPTED",
+            "ALREADY_DONE",
+            "REJECTED",
+            "UNAVAILABLE",
+            "DEADLINE_EXCEEDED",
+            "FAILED",
+            "UNKNOWN"
+          ]
+        },
+        "outcomeText": {
+          "$ref": "#/$defs/text"
+        },
+        "accepted": {
+          "type": "boolean"
+        },
+        "inProgress": {
+          "type": "boolean"
+        },
+        "completed": {
+          "type": "boolean"
+        },
+        "partial": {
+          "type": "boolean"
+        },
+        "outcomeUnknown": {
+          "type": "boolean"
+        },
+        "verificationSummary": {
+          "$ref": "#/$defs/text"
+        },
+        "authorizationSummary": {
+          "$ref": "#/$defs/text"
+        },
+        "plan": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/applicationDeploymentPlan"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "deploymentResult": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/applicationDeploymentResult"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "activation": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/applicationActivation"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "warnings": {
+          "$ref": "#/$defs/warnings"
+        },
+        "error": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/publicError"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "requestedAt": {
+          "$ref": "#/$defs/instant"
+        },
+        "completedAt": {
+          "$ref": "#/$defs/instant"
+        },
+        "elapsedMillis": {
+          "$ref": "#/$defs/nonNegativeLong"
+        },
+        "metadata": {
+          "$ref": "#/$defs/metadata"
+        }
+      }
+    },
+    "nuggetControlRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operationId",
+        "correlationId",
+        "action",
+        "mode",
+        "targetNuggetId",
+        "targetRuntimeId",
+        "targetGeneration",
+        "confirmationProvided",
+        "requestedAt",
+        "deadlineAt",
+        "metadata"
+      ],
+      "properties": {
+        "operationId": {
+          "$ref": "#/$defs/optionalToken"
+        },
+        "correlationId": {
+          "$ref": "#/$defs/optionalToken"
+        },
+        "action": {
+          "enum": [
+            "DRAIN_NUGGET",
+            "SHUTDOWN_NUGGET",
+            "KILL_NUGGET"
+          ]
+        },
+        "mode": {
+          "enum": [
+            "GRACEFUL",
+            "FORCED"
+          ]
+        },
+        "targetNuggetId": {
+          "$ref": "#/$defs/token"
+        },
+        "targetRuntimeId": {
+          "$ref": "#/$defs/token"
+        },
+        "targetGeneration": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        },
+        "confirmationProvided": {
+          "type": "boolean"
+        },
+        "requestedAt": {
+          "$ref": "#/$defs/instant"
+        },
+        "deadlineAt": {
+          "$ref": "#/$defs/instant"
+        },
+        "metadata": {
+          "$ref": "#/$defs/metadata"
+        }
+      }
+    },
+    "nuggetControlConfirmation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operationId",
+        "challenge",
+        "expiresAt",
+        "action",
+        "nuggetId",
+        "runtimeId",
+        "generation",
+        "callerId",
+        "state"
+      ],
+      "properties": {
+        "operationId": {
+          "$ref": "#/$defs/token"
+        },
+        "challenge": {
+          "$ref": "#/$defs/token"
+        },
+        "expiresAt": {
+          "$ref": "#/$defs/instant"
+        },
+        "action": {
+          "enum": [
+            "DRAIN_NUGGET",
+            "SHUTDOWN_NUGGET",
+            "KILL_NUGGET"
+          ]
+        },
+        "nuggetId": {
+          "$ref": "#/$defs/token"
+        },
+        "runtimeId": {
+          "$ref": "#/$defs/token"
+        },
+        "generation": {
+          "$ref": "#/$defs/nonNegativeLong"
+        },
+        "callerId": {
+          "$ref": "#/$defs/optionalToken"
+        },
+        "state": {
+          "$ref": "#/$defs/nuggetState"
+        }
+      }
+    },
+    "nuggetControlResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operationId",
+        "correlationId",
+        "action",
+        "mode",
+        "admitted",
+        "authorized",
+        "targetNuggetId",
+        "targetRuntimeId",
+        "targetGeneration",
+        "outcome",
+        "accepted",
+        "inProgress",
+        "completed",
+        "partial",
+        "outcomeUnknown",
+        "cleanupPartial",
+        "confirmation",
+        "warnings",
+        "error",
+        "requestedAt",
+        "completedAt",
+        "elapsedMillis",
+        "metadata"
+      ],
+      "properties": {
+        "operationId": {
+          "$ref": "#/$defs/optionalToken"
+        },
+        "correlationId": {
+          "$ref": "#/$defs/optionalToken"
+        },
+        "action": {
+          "enum": [
+            "DRAIN_NUGGET",
+            "SHUTDOWN_NUGGET",
+            "KILL_NUGGET"
+          ]
+        },
+        "mode": {
+          "enum": [
+            "GRACEFUL",
+            "FORCED"
+          ]
+        },
+        "admitted": {
+          "type": "boolean"
+        },
+        "authorized": {
+          "type": "boolean"
+        },
+        "targetNuggetId": {
+          "$ref": "#/$defs/token"
+        },
+        "targetRuntimeId": {
+          "$ref": "#/$defs/token"
+        },
+        "targetGeneration": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        },
+        "previousState": {
+          "$ref": "#/$defs/nuggetInfo/properties/state"
+        },
+        "currentState": {
+          "$ref": "#/$defs/nuggetInfo/properties/state"
+        },
+        "resultingState": {
+          "$ref": "#/$defs/nuggetInfo/properties/state"
+        },
+        "outcome": {
+          "enum": [
+            "CONFIRMATION_REQUIRED",
+            "ACCEPTED",
+            "IN_PROGRESS",
+            "COMPLETED",
+            "DENIED",
+            "DISABLED",
+            "UNAVAILABLE",
+            "TIMED_OUT",
+            "PARTIAL",
+            "OUTCOME_UNKNOWN"
+          ]
+        },
+        "outcomeText": {
+          "$ref": "#/$defs/text"
+        },
+        "accepted": {
+          "type": "boolean"
+        },
+        "inProgress": {
+          "type": "boolean"
+        },
+        "completed": {
+          "type": "boolean"
+        },
+        "partial": {
+          "type": "boolean"
+        },
+        "outcomeUnknown": {
+          "type": "boolean"
+        },
+        "cleanupPartial": {
+          "type": "boolean"
+        },
+        "confirmationRequired": {
+          "type": "boolean"
+        },
+        "confirmation": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/nuggetControlConfirmation"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "warnings": {
+          "$ref": "#/$defs/warnings"
+        },
+        "error": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/publicError"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "requestedAt": {
+          "$ref": "#/$defs/instant"
+        },
+        "completedAt": {
+          "$ref": "#/$defs/instant"
+        },
+        "elapsedMillis": {
+          "$ref": "#/$defs/nonNegativeLong"
+        },
+        "metadata": {
+          "$ref": "#/$defs/metadata"
+        }
+      }
+    },
+    "capabilitiesRequestEnvelope": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/typedRequestEnvelope"
+        },
+        {
+          "properties": {
+            "operationKind": {
+              "const": "CAPABILITIES"
+            },
+            "payloadType": {
+              "const": ""
+            },
+            "payload": {
+              "type": "null"
+            }
+          }
+        }
+      ]
+    },
+    "capabilitiesResultEnvelope": {
+      "$ref": "#/$defs/resultEnvelope-nugget-admin-capabilities-CAPABILITIES"
+    },
+    "discoveryQueryRequestEnvelope": {
+      "$ref": "#/$defs/requestEnvelope-nugget-discovery-query-DISCOVERY"
+    },
+    "discoverySelectorRequestEnvelope": {
+      "$ref": "#/$defs/requestEnvelope-nugget-discovery-selector-DISCOVERY"
+    },
+    "discoveryResultEnvelope": {
+      "$ref": "#/$defs/resultEnvelope-nugget-discovery-result-DISCOVERY"
+    },
+    "discoveryResolutionEnvelope": {
+      "$ref": "#/$defs/resultEnvelope-nugget-discovery-resolution-DISCOVERY"
+    },
+    "discoveryStatusSummaryEnvelope": {
+      "$ref": "#/$defs/resultEnvelope-nugget-discovery-status-summary-DISCOVERY"
+    },
+    "authenticationRequestEnvelope": {
+      "$ref": "#/$defs/requestEnvelope-nugget-authentication-request-AUTHENTICATION"
+    },
+    "authenticationResultEnvelope": {
+      "$ref": "#/$defs/resultEnvelope-nugget-authentication-result-AUTHENTICATION"
+    },
+    "introspectionRequestEnvelope": {
+      "$ref": "#/$defs/requestEnvelope-nugget-introspection-request-INTROSPECTION"
+    },
+    "introspectionQueryEnvelope": {
+      "$ref": "#/$defs/requestEnvelope-nugget-introspection-query-INTROSPECTION"
+    },
+    "introspectionDiskQueryEnvelope": {
+      "$ref": "#/$defs/requestEnvelope-nugget-introspection-disk-query-INTROSPECTION"
+    },
+    "introspectionRecentErrorQueryEnvelope": {
+      "$ref": "#/$defs/requestEnvelope-nugget-introspection-recent-error-query-INTROSPECTION"
+    },
+    "adminQueryEnvelope": {
+      "$ref": "#/$defs/requestEnvelope-nugget-admin-query-INTROSPECTION"
+    },
+    "nuggetStatusEnvelope": {
+      "$ref": "#/$defs/resultEnvelope-nugget-status-INTROSPECTION"
+    },
+    "introspectionResultEnvelope": {
+      "$ref": "#/$defs/resultEnvelope-nugget-introspection-result-INTROSPECTION"
+    },
+    "applicationLifecycleRequestEnvelope": {
+      "$ref": "#/$defs/requestEnvelope-nugget-application-lifecycle-request-APPLICATION_LIFECYCLE"
+    },
+    "applicationLifecycleResultEnvelope": {
+      "$ref": "#/$defs/resultEnvelope-nugget-application-lifecycle-result-APPLICATION_LIFECYCLE"
+    },
+    "nuggetControlRequestEnvelope": {
+      "$ref": "#/$defs/requestEnvelope-nugget-control-request-NUGGET_CONTROL"
+    },
+    "nuggetControlResultEnvelope": {
+      "$ref": "#/$defs/resultEnvelope-nugget-control-result-NUGGET_CONTROL"
+    },
+    "unavailableNullPayloadEnvelope": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/baseEnvelope"
+        },
+        {
+          "required": [
+            "outcome",
+            "header"
+          ],
+          "properties": {
+            "outcome": {
+              "const": "UNAVAILABLE"
+            },
+            "payloadType": {
+              "const": ""
+            },
+            "payload": {
+              "type": "null"
+            }
+          }
+        }
+      ]
+    },
+    "baseEnvelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "formatName": true,
+        "formatVersion": true,
+        "protocolVersion": true,
+        "requestId": true,
+        "correlationId": true,
+        "operationKind": true,
+        "payloadType": true,
+        "target": true,
+        "context": true,
+        "outcome": true,
+        "header": true,
+        "payload": true
+      }
+    },
+    "requestEnvelope-nugget-discovery-query-DISCOVERY": {
+      "$ref": "#/$defs/typedRequestEnvelope",
+      "properties": {
+        "operationKind": {
+          "const": "DISCOVERY"
+        },
+        "payloadType": {
+          "const": "nugget-discovery-query"
+        },
+        "payload": {
+          "$ref": "#/$defs/discoveryQueryRequest"
+        }
+      }
+    },
+    "requestEnvelope-nugget-discovery-selector-DISCOVERY": {
+      "$ref": "#/$defs/typedRequestEnvelope",
+      "properties": {
+        "operationKind": {
+          "const": "DISCOVERY"
+        },
+        "payloadType": {
+          "const": "nugget-discovery-selector"
+        },
+        "payload": {
+          "$ref": "#/$defs/discoverySelectorRequest"
+        }
+      }
+    },
+    "requestEnvelope-nugget-authentication-request-AUTHENTICATION": {
+      "$ref": "#/$defs/typedRequestEnvelope",
+      "properties": {
+        "operationKind": {
+          "const": "AUTHENTICATION"
+        },
+        "payloadType": {
+          "const": "nugget-authentication-request"
+        },
+        "payload": {
+          "$ref": "#/$defs/authenticationRequest"
+        }
+      }
+    },
+    "requestEnvelope-nugget-introspection-request-INTROSPECTION": {
+      "$ref": "#/$defs/typedRequestEnvelope",
+      "properties": {
+        "operationKind": {
+          "const": "INTROSPECTION"
+        },
+        "payloadType": {
+          "const": "nugget-introspection-request"
+        },
+        "payload": {
+          "$ref": "#/$defs/introspectionRequest"
+        }
+      }
+    },
+    "requestEnvelope-nugget-introspection-query-INTROSPECTION": {
+      "$ref": "#/$defs/typedRequestEnvelope",
+      "properties": {
+        "operationKind": {
+          "const": "INTROSPECTION"
+        },
+        "payloadType": {
+          "const": "nugget-introspection-query"
+        },
+        "payload": {
+          "$ref": "#/$defs/introspectionQuery"
+        }
+      }
+    },
+    "requestEnvelope-nugget-introspection-disk-query-INTROSPECTION": {
+      "$ref": "#/$defs/typedRequestEnvelope",
+      "properties": {
+        "operationKind": {
+          "const": "INTROSPECTION"
+        },
+        "payloadType": {
+          "const": "nugget-introspection-disk-query"
+        },
+        "payload": {
+          "$ref": "#/$defs/introspectionDiskQuery"
+        }
+      }
+    },
+    "requestEnvelope-nugget-introspection-recent-error-query-INTROSPECTION": {
+      "$ref": "#/$defs/typedRequestEnvelope",
+      "properties": {
+        "operationKind": {
+          "const": "INTROSPECTION"
+        },
+        "payloadType": {
+          "const": "nugget-introspection-recent-error-query"
+        },
+        "payload": {
+          "$ref": "#/$defs/introspectionRecentErrorQuery"
+        }
+      }
+    },
+    "requestEnvelope-nugget-admin-query-INTROSPECTION": {
+      "$ref": "#/$defs/typedRequestEnvelope",
+      "properties": {
+        "operationKind": {
+          "const": "INTROSPECTION"
+        },
+        "payloadType": {
+          "const": "nugget-admin-query"
+        },
+        "payload": {
+          "$ref": "#/$defs/adminQuery"
+        }
+      }
+    },
+    "requestEnvelope-nugget-application-lifecycle-request-APPLICATION_LIFECYCLE": {
+      "$ref": "#/$defs/typedRequestEnvelope",
+      "properties": {
+        "operationKind": {
+          "const": "APPLICATION_LIFECYCLE"
+        },
+        "payloadType": {
+          "const": "nugget-application-lifecycle-request"
+        },
+        "payload": {
+          "$ref": "#/$defs/applicationLifecycleRequest"
+        }
+      }
+    },
+    "requestEnvelope-nugget-control-request-NUGGET_CONTROL": {
+      "$ref": "#/$defs/typedRequestEnvelope",
+      "properties": {
+        "operationKind": {
+          "const": "NUGGET_CONTROL"
+        },
+        "payloadType": {
+          "const": "nugget-control-request"
+        },
+        "payload": {
+          "$ref": "#/$defs/nuggetControlRequest"
+        }
+      }
+    },
+    "resultEnvelope-nugget-admin-capabilities-CAPABILITIES": {
+      "$ref": "#/$defs/typedResultEnvelope",
+      "properties": {
+        "operationKind": {
+          "const": "CAPABILITIES"
+        },
+        "payloadType": {
+          "const": "nugget-admin-capabilities"
+        },
+        "payload": {
+          "$ref": "#/$defs/capabilitiesResult"
+        }
+      }
+    },
+    "resultEnvelope-nugget-discovery-result-DISCOVERY": {
+      "$ref": "#/$defs/typedResultEnvelope",
+      "properties": {
+        "operationKind": {
+          "const": "DISCOVERY"
+        },
+        "payloadType": {
+          "const": "nugget-discovery-result"
+        },
+        "payload": {
+          "$ref": "#/$defs/discoveryResult"
+        }
+      }
+    },
+    "resultEnvelope-nugget-discovery-resolution-DISCOVERY": {
+      "$ref": "#/$defs/typedResultEnvelope",
+      "properties": {
+        "operationKind": {
+          "const": "DISCOVERY"
+        },
+        "payloadType": {
+          "const": "nugget-discovery-resolution"
+        },
+        "payload": {
+          "$ref": "#/$defs/discoveryResolution"
+        }
+      }
+    },
+    "resultEnvelope-nugget-discovery-status-summary-DISCOVERY": {
+      "$ref": "#/$defs/typedResultEnvelope",
+      "properties": {
+        "operationKind": {
+          "const": "DISCOVERY"
+        },
+        "payloadType": {
+          "const": "nugget-discovery-status-summary"
+        },
+        "payload": {
+          "$ref": "#/$defs/discoveryStatusSummary"
+        }
+      }
+    },
+    "resultEnvelope-nugget-authentication-result-AUTHENTICATION": {
+      "$ref": "#/$defs/typedResultEnvelope",
+      "properties": {
+        "operationKind": {
+          "const": "AUTHENTICATION"
+        },
+        "payloadType": {
+          "const": "nugget-authentication-result"
+        },
+        "payload": {
+          "$ref": "#/$defs/authenticationResult"
+        }
+      }
+    },
+    "resultEnvelope-nugget-status-INTROSPECTION": {
+      "$ref": "#/$defs/typedResultEnvelope",
+      "properties": {
+        "operationKind": {
+          "const": "INTROSPECTION"
+        },
+        "payloadType": {
+          "const": "nugget-status"
+        },
+        "payload": {
+          "$ref": "#/$defs/nuggetStatus"
+        }
+      }
+    },
+    "resultEnvelope-nugget-introspection-result-INTROSPECTION": {
+      "$ref": "#/$defs/typedResultEnvelope",
+      "properties": {
+        "operationKind": {
+          "const": "INTROSPECTION"
+        },
+        "payloadType": {
+          "const": "nugget-introspection-result"
+        },
+        "payload": {
+          "$ref": "#/$defs/introspectionResult"
+        }
+      }
+    },
+    "resultEnvelope-nugget-application-lifecycle-result-APPLICATION_LIFECYCLE": {
+      "$ref": "#/$defs/typedResultEnvelope",
+      "properties": {
+        "operationKind": {
+          "const": "APPLICATION_LIFECYCLE"
+        },
+        "payloadType": {
+          "const": "nugget-application-lifecycle-result"
+        },
+        "payload": {
+          "$ref": "#/$defs/applicationLifecycleResult"
+        }
+      }
+    },
+    "resultEnvelope-nugget-control-result-NUGGET_CONTROL": {
+      "$ref": "#/$defs/typedResultEnvelope",
+      "properties": {
+        "operationKind": {
+          "const": "NUGGET_CONTROL"
+        },
+        "payloadType": {
+          "const": "nugget-control-result"
+        },
+        "payload": {
+          "$ref": "#/$defs/nuggetControlResult"
+        }
+      }
+    },
+    "typedRequestEnvelope": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/baseEnvelope"
+        },
+        {
+          "not": {
+            "required": [
+              "outcome"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "header"
+            ]
+          }
+        }
+      ]
+    },
+    "typedResultEnvelope": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/baseEnvelope"
+        },
+        {
+          "required": [
+            "outcome",
+            "header"
+          ]
+        }
+      ]
+    }
+  }
+}

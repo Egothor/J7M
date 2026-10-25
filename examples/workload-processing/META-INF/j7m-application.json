@@ -1,0 +1,40 @@
+{
+  "schemaVersion": "j7m.application/v1",
+  "application": {
+    "group": "org.j7m.examples",
+    "name": "workload-processing",
+    "version": "1.0.0",
+    "displayName": "Workload Processing",
+    "description": "Deployable in-memory workload lifecycle example"
+  },
+  "runtime": {
+    "minJ7mVersion": "0.5.6",
+    "javaVersion": "25",
+    "moduleMode": "CLASSPATH",
+    "bootstrapClass": "org.j7m.middleware.examples.workload.WorkloadProcessingApplication"
+  },
+  "services": [
+    {
+      "serviceName": "//apps/example/workload/ProcessingService",
+      "interfaceName": "org.j7m.middleware.examples.workload.WorkloadProcessingService",
+      "implementationClass": "org.j7m.middleware.examples.workload.WorkloadProcessingServiceImpl",
+      "transport": "grpc",
+      "globallyExported": true,
+      "metadata": {
+        "domain": "example",
+        "classification": "internal",
+        "example": "workload-processing"
+      }
+    }
+  ],
+  "security": {
+    "trustDomain": "dev",
+    "confidential": false
+  },
+  "resources": {
+    "cpu": "1",
+    "memory": "256MiB",
+    "maxConcurrentInvocations": 16,
+    "maxInboundPayload": "1MiB"
+  }
+}

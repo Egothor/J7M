@@ -1,0 +1,401 @@
+[
+  {
+    "Home": "index.md"
+  },
+  {
+    "Overview": [
+      {
+        "Overview": "overview/index.md"
+      },
+      {
+        "Architecture": "overview/architecture.md"
+      },
+      {
+        "Modules and Dependencies": "overview/modules.md"
+      },
+      {
+        "Capabilities and Boundaries": "overview/capabilities.md"
+      },
+      {
+        "Terminology": "overview/terminology.md"
+      },
+      {
+        "Choosing J7M": "overview/evaluation.md"
+      }
+    ]
+  },
+  {
+    "Get Started": [
+      {
+        "Start Here": "getting-started/index.md"
+      },
+      {
+        "Requirements": "getting-started/prerequisites.md"
+      },
+      {
+        "Build J7M": "getting-started/build.md"
+      },
+      {
+        "Your First Application": "getting-started/first-application.md"
+      },
+      {
+        "Separate JVMs": "getting-started/separate-jvms.md"
+      },
+      {
+        "Package and Deploy": "getting-started/package-and-deploy.md"
+      }
+    ]
+  },
+  {
+    "Programming": [
+      {
+        "Overview": "programming/index.md"
+      },
+      {
+        "Services and References": "programming/services.md"
+      },
+      {
+        "Injection and Scopes": "programming/injection.md"
+      },
+      {
+        "Lifecycle": "programming/lifecycle.md"
+      },
+      {
+        "Configuration and Context": "programming/configuration-context.md"
+      },
+      {
+        "Schemas, Adapters and JPMS": "programming/schemas-jpms.md"
+      },
+      {
+        "Invocation": "programming/invocation.md"
+      },
+      {
+        "Selection and Performance": "programming/selection-performance.md"
+      },
+      {
+        "Remote Streams": "programming/remote-streams.md"
+      },
+      {
+        "Workloads": "programming/workloads.md"
+      },
+      {
+        "Adapter SPI and TCK": "programming/adapters.md"
+      },
+      {
+        "Durable Log": "programming/durable-log.md"
+      },
+      {
+        "Local Coordination": "programming/local-coordination.md"
+      },
+      {
+        "Contexts and Identities": "programming/contexts-identities.md"
+      },
+      {
+        "JPMS Dependency Reference": "programming/module-dependencies.md"
+      }
+    ]
+  },
+  {
+    "Patterns": [
+      {
+        "Choose a Pattern": "patterns/index.md"
+      },
+      {
+        "Discovery and Refresh": "patterns/discovery-refresh.md"
+      },
+      {
+        "Request–Reply": "patterns/request-reply.md"
+      },
+      {
+        "Callbacks": "patterns/callbacks.md"
+      },
+      {
+        "Async, Cancellation and Deadlines": "patterns/async-cancellation.md"
+      },
+      {
+        "Streaming and Backpressure": "patterns/streaming-backpressure.md"
+      },
+      {
+        "Availability and Failover": "patterns/availability-failover.md"
+      },
+      {
+        "Durable Deduplication": "patterns/deduplication.md"
+      },
+      {
+        "Durable Work Queues": "patterns/work-queues.md"
+      },
+      {
+        "Dead Letters and Redrive": "patterns/dead-letters.md"
+      },
+      {
+        "Inbox and Outbox": "patterns/inbox-outbox.md"
+      },
+      {
+        "Event Subscriptions": "patterns/event-subscriptions.md"
+      },
+      {
+        "Partitioned State": "patterns/partitioned-state.md"
+      },
+      {
+        "Leases and Fencing": "patterns/leases-fencing.md"
+      },
+      {
+        "Durable Jobs": "patterns/durable-jobs.md"
+      },
+      {
+        "Persistent Schedules": "patterns/persistent-schedules.md"
+      },
+      {
+        "Sagas and Reconciliation": "patterns/sagas.md"
+      },
+      {
+        "Transactions": "patterns/transactions.md"
+      }
+    ]
+  },
+  {
+    "Annotations": [
+      {
+        "All 80 Annotations": "annotations/index.md"
+      },
+      {
+        "Components and Injection": "annotations/components.md"
+      },
+      {
+        "Applications and Services": "annotations/services.md"
+      },
+      {
+        "Lifecycle and Health": "annotations/lifecycle.md"
+      },
+      {
+        "Configuration and Context": "annotations/configuration-context.md"
+      },
+      {
+        "Invocation": "annotations/invocation.md"
+      },
+      {
+        "Availability and Resilience": "annotations/resilience.md"
+      },
+      {
+        "Admission and Workloads": "annotations/admission-workloads.md"
+      },
+      {
+        "Serialization": "annotations/serialization.md"
+      },
+      {
+        "Deduplication and Transactions": "annotations/transactions.md"
+      },
+      {
+        "Ownership and Partitioning": "annotations/ownership-partitioning.md"
+      },
+      {
+        "Messaging and Events": "annotations/messaging-events.md"
+      },
+      {
+        "Jobs and Scheduling": "annotations/jobs-scheduling.md"
+      },
+      {
+        "Sagas": "annotations/sagas.md"
+      },
+      {
+        "Security and Observability": "annotations/security-observability.md"
+      }
+    ]
+  },
+  {
+    "Configuration": [
+      {
+        "Overview": "configuration/index.md"
+      },
+      {
+        "Runtime and Host": "configuration/runtime.md"
+      },
+      {
+        "Discovery: Multicast and Unicast": "configuration/discovery.md"
+      },
+      {
+        "Transports": "configuration/transports.md"
+      },
+      {
+        "Applications and Host Policies": "configuration/application-policies.md"
+      },
+      {
+        "Distributed Resources": "configuration/distributed-resources.md"
+      },
+      {
+        "Limits and Observability": "configuration/limits-observability.md"
+      }
+    ]
+  },
+  {
+    "Deployment": [
+      {
+        "Overview": "deployment/index.md"
+      },
+      {
+        "Artifacts": "deployment/artifacts.md"
+      },
+      {
+        "Topologies": "deployment/topologies.md"
+      },
+      {
+        "Signed Applications": "deployment/signed-applications.md"
+      },
+      {
+        "Network and Storage": "deployment/network-storage.md"
+      },
+      {
+        "Containers": "deployment/containers.md"
+      },
+      {
+        "Lifecycle": "deployment/lifecycle.md"
+      },
+      {
+        "Verification": "deployment/verification.md"
+      },
+      {
+        "Gradle Workflow": "deployment/gradle-workflow.md"
+      },
+      {
+        "Application Repositories": "deployment/repositories.md"
+      },
+      {
+        "Repository Replication": "deployment/repository-replication.md"
+      },
+      {
+        "Upgrade and Rollback": "deployment/upgrade-rollback.md"
+      }
+    ]
+  },
+  {
+    "Security": [
+      {
+        "Overview": "security/index.md"
+      },
+      {
+        "Identity and Trust": "security/identity-and-trust.md"
+      },
+      {
+        "TLS and Certificates": "security/tls-and-certificates.md"
+      },
+      {
+        "Signing and Secrets": "security/signing-and-secrets.md"
+      },
+      {
+        "Isolation and Audit": "security/isolation-and-audit.md"
+      },
+      {
+        "Production Hardening": "security/production-hardening.md"
+      },
+      {
+        "Administrative PIN": "security/administrative-pin.md"
+      },
+      {
+        "Audit Export": "security/audit-export.md"
+      },
+      {
+        "Incident Recovery": "security/incident-recovery.md"
+      },
+      {
+        "Credential Rotation": "security/credential-rotation.md"
+      },
+      {
+        "Isolation Providers": "security/isolation-providers.md"
+      },
+      {
+        "Enterprise Integrations": "security/enterprise-integrations.md"
+      }
+    ]
+  },
+  {
+    "Operations": [
+      {
+        "Overview": "operations/index.md"
+      },
+      {
+        "Inspection": "operations/inspection.md"
+      },
+      {
+        "Monitoring": "operations/monitoring.md"
+      },
+      {
+        "Runbooks": "operations/runbooks.md"
+      },
+      {
+        "Recovery": "operations/recovery.md"
+      },
+      {
+        "Capacity and Performance": "operations/capacity.md"
+      }
+    ]
+  },
+  {
+    "Testing": [
+      {
+        "Overview": "testing/index.md"
+      },
+      {
+        "Integration Tests": "testing/integration-tests.md"
+      },
+      {
+        "Failure Injection": "testing/failure-injection.md"
+      },
+      {
+        "Verified Examples": "testing/verified-examples.md"
+      }
+    ]
+  },
+  {
+    "Reference": [
+      {
+        "Overview": "reference/index.md"
+      },
+      {
+        "Configuration": "reference/configuration.md"
+      },
+      {
+        "Manifests and Policies": "reference/manifests-policies.md"
+      },
+      {
+        "Error Codes": "reference/errors.md"
+      },
+      {
+        "Distributed Semantics": "reference/semantics.md"
+      },
+      {
+        "Limits and Defaults": "reference/limits.md"
+      },
+      {
+        "Glossary": "reference/glossary.md"
+      },
+      {
+        "Command Line": "reference/cli.md"
+      },
+      {
+        "Administrative API": "reference/admin-api.md"
+      },
+      {
+        "Administrative JSON": "reference/admin-json.md"
+      },
+      {
+        "Local Messaging Storage": "reference/local-messaging-storage.md"
+      }
+    ]
+  },
+  {
+    "Project": [
+      {
+        "Project": "about/index.md"
+      },
+      {
+        "Contributing": "about/contributing.md"
+      },
+      {
+        "BSD 4-Clause License": "about/license.md"
+      },
+      {
+        "Middleware Contributions": "about/middleware-contributing.md"
+      }
+    ]
+  }
+]

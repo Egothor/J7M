@@ -1,0 +1,45 @@
+// Copyright (c) 2026, Leo Galambos and the Egothor team
+// https://www.egothor.org
+// SPDX-License-Identifier: BSD-4-Clause
+// Licensed under the BSD 4-Clause License; see LICENSE for the full terms.
+// This product includes software developed by Leo Galambos and the Egothor
+// team (https://www.egothor.org).
+
+dependencies {
+    api project(":j7m-consensus")
+    testImplementation libs.junit.jupiter
+    testRuntimeOnly libs.junit.platform.launcher
+}
+
+tasks.named('test') {
+    systemProperty 'j7m.distributed.test.classpath', sourceSets.test.runtimeClasspath.asPath
+}
+
+// Full-hour acceptance is explicit and never represented as a skipped ordinary unit test.
+tasks.register('writeAcceptanceClasspath') {
+    dependsOn tasks.named('testClasses')
+    outputs.file(layout.buildDirectory.file('acceptance-classpath.txt'))
+    doLast {
+        layout.buildDirectory.file('acceptance-classpath.txt').get().asFile.text = sourceSets.test.runtimeClasspath.asPath
+    }
+}
+
+tasks.register('runDistributedAcceptanceSoak', JavaExec) {
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'org.j7m.middleware.distributed.DistributedAcceptanceSoak'
+    doFirst {
+        if (!project.hasProperty('acceptanceEvidence')) throw new GradleException('Provide -PacceptanceEvidence=<fresh-directory> for the actual full-hour workload')
+        args project.property('acceptanceEvidence'), rootProject.projectDir.absolutePath
+    }
+}
+
+tasks.register('validateDistributedAcceptance', JavaExec) {
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'org.j7m.middleware.distributed.DistributedAcceptanceEvidenceVerifier'
+    doFirst {
+        if (!project.hasProperty('acceptanceEvidence')) throw new GradleException('Provide -PacceptanceEvidence=<completed-real-run-directory>')
+        args project.property('acceptanceEvidence'), rootProject.projectDir.absolutePath
+    }
+}

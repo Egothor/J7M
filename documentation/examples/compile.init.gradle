@@ -1,0 +1,83 @@
+// Copyright (c) 2026, Leo Galambos and the Egothor team
+// https://www.egothor.org
+// SPDX-License-Identifier: BSD-4-Clause
+// Licensed under the BSD 4-Clause License; see LICENSE for the full terms.
+// This product includes software developed by Leo Galambos and the Egothor
+// team (https://www.egothor.org).
+
+// Purpose: compile and verify the manual's Java examples without modifying the root build.
+// Usage: ./gradlew -I documentation/examples/compile.init.gradle documentationVerify
+// Inputs: repository modules, examples/src/main/java and examples/src/test/java.
+// Outputs: documentation/examples/build; nonzero exit means compilation or verification failed.
+import org.gradle.api.tasks.compile.JavaCompile
+import org.gradle.api.tasks.testing.Test
+import org.gradle.api.tasks.JavaExec
+
+gradle.projectsEvaluated {
+    def root = gradle.rootProject
+    if (root.findProject(':j7m-application-distributed') == null) return
+    def directory = root.file('documentation/examples')
+    def modules = [':j7m-application-distributed', ':j7m-runtime', ':j7m-transport-grpc'].collect { root.project(it) }
+    def processor = root.project(':j7m-annotation-processor')
+    def classes = new File(directory, 'build/classes/main')
+    def testClasses = new File(directory, 'build/classes/test')
+    def runtime = root.files(modules.collect { it.sourceSets.main.runtimeClasspath })
+    def testRuntime = root.files(runtime, classes, root.project(':j7m-runtime').sourceSets.test.runtimeClasspath)
+    def compile = root.tasks.register('documentationCompile', JavaCompile) {
+        group = 'documentation'
+        description = 'Compiles manual examples using the real J7M annotation processor.'
+        dependsOn modules.collect { it.tasks.named('classes') }, processor.tasks.named('classes')
+        source root.fileTree(new File(directory, 'src/main/java')) { include '**/*.java' }
+        classpath = runtime
+        destinationDirectory.set(classes)
+        options.annotationProcessorPath = processor.sourceSets.main.runtimeClasspath
+        options.compilerArgs.addAll(['-processor', 'org.j7m.middleware.processor.J7mProcessor'])
+        options.generatedSourceOutputDirectory.set(new File(directory, 'build/generated'))
+        sourceCompatibility = '25'
+        targetCompatibility = '25'
+    }
+    def compileTests = root.tasks.register('documentationCompileTests', JavaCompile) {
+        dependsOn compile
+        source root.fileTree(new File(directory, 'src/test/java')) { include '**/*.java' }
+        classpath = testRuntime
+        destinationDirectory.set(testClasses)
+        options.compilerArgs.add('-proc:none')
+        sourceCompatibility = '25'
+        targetCompatibility = '25'
+    }
+    def verify = root.tasks.register('documentationVerify', Test) {
+        group = 'documentation'
+        description = 'Runs the manual examples and their observable success/failure checks.'
+        dependsOn compileTests
+        testClassesDirs = root.files(testClasses)
+        classpath = root.files(testRuntime, testClasses)
+        useJUnitPlatform()
+        outputs.upToDateWhen { false }
+        reports.junitXml.outputLocation.set(new File(directory, 'build/test-results'))
+        reports.html.outputLocation.set(new File(directory, 'build/test-report'))
+    }
+    ['Container', 'Schema', 'Runtime', 'Queue', 'Failover'].each { example ->
+        root.tasks.register('documentationRun' + example, JavaExec) {
+            group = 'documentation'
+            description = 'Runs the ' + example + ' manual example.'
+            dependsOn compile
+            classpath = root.files(runtime, classes)
+            mainClass.set('org.j7m.documentation.' + example + 'Example')
+        }
+    }
+    if (gradle.startParameter.taskNames.any { it.endsWith('documentationIntegration') }) {
+        def actual = root.project(':j7m-application-distributed').tasks.named('test') {
+            outputs.upToDateWhen { false }
+            filter {
+                includeTestsMatching '*ManagedQueueGeneratedIT.generatedCallbackHasPreconstructorGuardIdentityAndActualTrackedTraceOverThreeVoterPush'
+                includeTestsMatching '*ManagedJobGeneratedIT.generatedProviderCheckpointProgressAndFreshRestoreUseActualNativeOwnershipAndPhysicalCompletion'
+                includeTestsMatching '*ManagedSagaGeneratedIT.actualGeneratedSagaRejectsMissingBackendPolicyAndAdministrationBeforeConstructorsThenRunsAndCompensates'
+            }
+        }
+        root.tasks.register('documentationIntegration') {
+            group = 'documentation'
+            description = 'Runs unchanged real managed queue, job and saga integration proofs used by the manual.'
+            dependsOn actual
+        }
+    }
+}

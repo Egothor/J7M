@@ -1,0 +1,579 @@
+// Copyright (c) 2026, Leo Galambos and the Egothor team
+// https://www.egothor.org
+// SPDX-License-Identifier: BSD-4-Clause
+// Licensed under the BSD 4-Clause License; see LICENSE for the full terms.
+// This product includes software developed by Leo Galambos and the Egothor
+// team (https://www.egothor.org).
+
+/*
+ * Purpose: orchestrates developer-facing example validation, packaging, smoke runs,
+ * and local deployer workflow placeholders.
+ * Owns: validateRequiredExampleFiles, validateExampleReadmes, validateExamples,
+ * buildExamples, packageExamples, verifyExamples, runExamplesSmoke, and j7m* local workflow tasks.
+ * Must not own: production module dependencies, j7m-demo JavaExec task bodies,
+ * or source code for examples.
+ * Root rationale: examples span standalone directories and compiled support modules,
+ * so root orchestration validates taxonomy without hiding module-local dependencies.
+ * Related validation tasks: validateExamples, validateExampleReadmes,
+ * validateAnnotationExamples, validateExampleSourceDocumentation.
+ */
+
+tasks.register("validateRequiredExampleFiles") {
+    group = "verification"
+    description = "Validates required Phase 5.5 example files and README sections."
+    dependsOn "validateExampleJavadocs"
+    dependsOn "validateExampleSourceDocumentation"
+    doLast {
+        List<String> examples = [
+                "hello-remote-service",
+                "callbacks-and-events",
+                "secure-banking-workflow",
+                "workload-processing",
+                "streaming-pipeline",
+                "ha-hp-cluster",
+                "deployable-application",
+                "regulated-enterprise-app",
+                "annotation-first-simple-service",
+                "annotation-first-secure-service",
+                "annotation-first-remote-invocation",
+                "annotation-first-security-audit",
+                "annotation-first-saga-workflow",
+                "annotation-first-durable-queue-consumer",
+                "annotation-first-lifecycle",
+                "annotation-first-isolation-profile",
+                "annotation-first-observability",
+                "nugget-admin-console"
+        ]
+        List<String> additionalExamples = [
+                "modular-deployable-application"
+        ]
+        Set<String> nonModularAnnotationExamples = [
+                "annotation-first-remote-invocation",
+                "annotation-first-security-audit"
+        ] as Set
+        Set<String> basicAnnotationExamplesWithoutManifest = [
+                "annotation-first-simple-service",
+                "annotation-first-lifecycle"
+        ] as Set
+        List<String> allDocumentedExamples = []
+        allDocumentedExamples.addAll(examples)
+        allDocumentedExamples.addAll(additionalExamples)
+        List<String> templates = [
+                "annotation-first-service",
+                "deployable-app",
+                "secure-service",
+                "simple-service",
+                "streaming-app",
+                "workload-app"
+        ]
+        List<String> sections = [
+                "Purpose",
+                "Architecture flow",
+                "Prerequisites",
+                "Build",
+                "Test",
+                "Package",
+                "Verify bundle",
+                "Deploy to local repository",
+                "Start / activate",
+                "Invoke / verify behavior",
+                "Status / observability",
+                "Stop / unload",
+                "Upgrade / rollback, where applicable",
+                "Expected output",
+                "Security notes",
+                "Cleanup",
+                "Known limitations"
+        ]
+        allDocumentedExamples.each { String example ->
+            File root = file("examples/${example}")
+            File readme = new File(root, "README.md")
+            if (!readme.isFile()) {
+                throw new GradleException("missing README for required example ${example}")
+            }
+            String readmeText = readme.getText("UTF-8")
+            sections.each { String section ->
+                if (!readmeText.contains("## ${section}")) {
+                    throw new GradleException("README for ${example} missing section ${section}")
+                }
+            }
+            String lower = readmeText.toLowerCase(java.util.Locale.ROOT)
+            ["documentation placeholder", "deferred", "future packaged", "future end-to-end"].each { String marker ->
+                if (lower.contains(marker)) {
+                    throw new GradleException("required example ${example} contains placeholder marker: ${marker}")
+                }
+            }
+        }
+        examples.each { String example ->
+            File root = file("examples/${example}")
+            if (!new File(root, "build.gradle").isFile()) {
+                throw new GradleException("missing build.gradle for required example ${example}")
+            }
+            File manifest = new File(root, "META-INF/j7m-application.json")
+            if (example == "nugget-admin-console") {
+                if (manifest.isFile()) {
+                    throw new GradleException("operator-only example ${example} must not declare a J7M application manifest")
+                }
+            } else if (basicAnnotationExamplesWithoutManifest.contains(example)) {
+                if (manifest.isFile()) {
+                    throw new GradleException("BASIC annotation example ${example} must not declare a J7M application manifest without production packaging validation")
+                }
+            } else if (!manifest.isFile()) {
+                throw new GradleException("missing manifest for required example ${example}")
+            }
+            File mainRoot = new File(root, "src/main/java")
+            File testRoot = new File(root, "src/test/java")
+            if (!mainRoot.isDirectory() || fileTree(mainRoot).matching { include "**/*.java" }.files.isEmpty()) {
+                throw new GradleException("full example ${example} has no main Java source")
+            }
+            if (!testRoot.isDirectory() || fileTree(testRoot).matching { include "**/*.java" }.files.isEmpty()) {
+                throw new GradleException("full example ${example} has no test Java source")
+            }
+            if (!nonModularAnnotationExamples.contains(example) && !new File(mainRoot, "module-info.java").isFile()) {
+                throw new GradleException("full example ${example} missing JPMS module-info.java")
+            }
+            File expectedOutput = new File(root, "EXPECTED_OUTPUT.txt")
+            if (!expectedOutput.isFile()) {
+                throw new GradleException("full example ${example} missing EXPECTED_OUTPUT.txt")
+            }
+            List<String> requiredMarkers = []
+            switch (example) {
+                case "hello-remote-service":
+                    requiredMarkers = ["export", "lookup", "proxy invocation", "package/deploy/start/status"]
+                    break
+                case "callbacks-and-events":
+                    requiredMarkers = ["callback", "grpc", "rmi", "audit"]
+                    break
+                case "secure-banking-workflow":
+                    requiredMarkers = ["@requiresrole", "@requirespermission", "@sensitive", "denied"]
+                    break
+                case "workload-processing":
+                    requiredMarkers = ["checkpoint", "lease", "fencing", "cancellation"]
+                    break
+                case "streaming-pipeline":
+                    requiredMarkers = ["server batch", "client batch", "bidirectional", "backpressure"]
+                    break
+                case "ha-hp-cluster":
+                    requiredMarkers = ["failover", "overload penalty", "selection explanation"]
+                    break
+                case "deployable-application":
+                    requiredMarkers = [".j7m", "repository publish", "upgrade", "rollback"]
+                    break
+                case "regulated-enterprise-app":
+                    requiredMarkers = ["compliance evidence", "tamper-evident", "crypto posture", "no certification claim"]
+                    break
+                case "annotation-first-simple-service":
+                    requiredMarkers = ["@j7mapplication", "@j7mservice", "constructor injection", "@j7mresource"]
+                    break
+                case "annotation-first-secure-service":
+                    requiredMarkers = ["@requiresrole", "@requirespermission", "@sensitive", "denied"]
+                    break
+                case "annotation-first-remote-invocation":
+                    requiredMarkers = ["@remoteservice", "@oneway", "@callback", "non-idempotent"]
+                    break
+                case "annotation-first-security-audit":
+                    requiredMarkers = ["@requiresrole", "@requirespermission", "@requirestrustdomain", "confidential boundary"]
+                    break
+                case "annotation-first-saga-workflow":
+                    requiredMarkers = ["@sagadefinition", "@sagastep", "@compensation", "descriptor-only"]
+                    break
+                case "annotation-first-durable-queue-consumer":
+                    requiredMarkers = ["@durablequeueconsumer", "@outboxpublisher", "@inboxhandler", "descriptor-only"]
+                    break
+                case "annotation-first-lifecycle":
+                    requiredMarkers = ["@initialize", "@startup", "@healthcheck", "@readinesscheck"]
+                    break
+                case "annotation-first-isolation-profile":
+                    requiredMarkers = ["@isolationprofile", "descriptor-only", "isolationprovider"]
+                    break
+                case "annotation-first-observability":
+                    requiredMarkers = ["workload", "routing", "recovery", "benchmark"]
+                    break
+                case "nugget-admin-console":
+                    requiredMarkers = ["safe pin", "discovery", "auth", "status", "info", "inspection", "lifecycle", "kill-disabled"]
+                    break
+                default:
+                    requiredMarkers = []
+            }
+            String readmeText = new File(root, "README.md").getText("UTF-8").toLowerCase(java.util.Locale.ROOT)
+            requiredMarkers.each { String marker ->
+                if (!readmeText.contains(marker)) {
+                    throw new GradleException("README for ${example} does not document required scenario marker ${marker}")
+                }
+            }
+            fileTree(root).matching { include "**/*.java"; exclude "**/build/**" }.files.each { File source ->
+                String text = source.getText("UTF-8").toLowerCase(java.util.Locale.ROOT)
+                ["todo", "unsupportedoperationexception", "not implemented", "placeholder"].each { String marker ->
+                    if (text.contains(marker)) {
+                        throw new GradleException("full example ${example} contains placeholder source marker ${marker} in ${source}")
+                    }
+                }
+            }
+        }
+        templates.each { String template ->
+            File root = file("examples/templates/${template}")
+            if (!root.isDirectory() || !new File(root, "README.md").isFile()) {
+                throw new GradleException("missing template example ${template}")
+            }
+        }
+        if (!file("examples/regulated-enterprise-app/META-INF/sbom.spdx.json").isFile()) {
+            throw new GradleException("regulated enterprise example missing SBOM")
+        }
+        if (!file("examples/regulated-enterprise-app/META-INF/j7m-provenance.json").isFile()) {
+            throw new GradleException("regulated enterprise example missing provenance")
+        }
+    }
+}
+
+tasks.register("validateExampleReadmes") {
+    group = "verification"
+    description = "Validates README command and output coverage for full examples and templates."
+    dependsOn "validateRequiredExampleFiles"
+    dependsOn "validateExampleJavadocs"
+    dependsOn "validateExampleSourceDocumentation"
+}
+
+tasks.register("runExamplesSmoke") {
+    group = "verification"
+    description = "Runs smoke coverage for all full example scenarios through executable demo tasks."
+    dependsOn ":j7m-demo:runHelloRemoteServiceExample"
+    dependsOn ":j7m-demo:runCallbacksAndEventsExample"
+    dependsOn ":j7m-demo:runSecureBankingWorkflowExample"
+    dependsOn ":j7m-demo:runWorkloadProcessingExample"
+    dependsOn ":j7m-demo:runStreamingPipelineExample"
+    dependsOn ":j7m-demo:runHaHpClusterExample"
+    dependsOn ":j7m-demo:runApplicationDeploymentDemo"
+    dependsOn ":j7m-demo:runApplicationUpgradeRollbackDemo"
+    dependsOn ":j7m-demo:runRegulatedEnterpriseAppExample"
+    dependsOn ":j7m-demo:runAnnotationModelDemo"
+    dependsOn ":j7m-demo:runNuggetCliDemo"
+    dependsOn ":j7m-demo:runNuggetCliApplicationLifecycleDemo"
+    dependsOn ":j7m-demo:runNuggetCliKillDisabledDemo"
+    dependsOn ":j7m-demo:runNuggetCliPinFailureDemo"
+}
+
+tasks.register("validateExamples") {
+    group = "verification"
+    description = "Rejects empty-shell full examples and verifies scenario-backed example coverage."
+    dependsOn "validateRequiredExampleFiles"
+    dependsOn "validateExampleReadmes"
+    dependsOn "validateAnnotationExamples"
+    dependsOn "validateExampleJavadocs"
+    dependsOn "validateExampleSourceDocumentation"
+}
+
+tasks.register("compileNuggetAdminConsoleExample", JavaCompile) {
+    group = "verification"
+    description = "Compiles the standalone nugget admin console example sources from the root build without adding a settings entry."
+    source = files(
+            fileTree("examples/nugget-admin-console/src/main/java") {
+                include "**/*.java"
+            },
+            fileTree("examples/nugget-admin-console/src/test/java") {
+                include "**/*.java"
+            })
+    classpath = files()
+    destinationDirectory = layout.buildDirectory.dir("classes/nugget-admin-console-example")
+    options.release = 25
+    options.encoding = "UTF-8"
+}
+
+tasks.register("runNuggetAdminConsoleRunbookTest", JavaExec) {
+    group = "verification"
+    description = "Runs the standalone nugget admin console runbook command-form checks."
+    dependsOn "compileNuggetAdminConsoleExample"
+    classpath = files(layout.buildDirectory.dir("classes/nugget-admin-console-example"))
+    mainClass = "org.j7m.examples.nugget.console.NuggetAdminConsoleRunbookTest"
+    outputs.file layout.buildDirectory.file("reports/j7m/examples/nugget-admin-console-runbook-commands.out")
+    java.io.ByteArrayOutputStream capturedOutput = new java.io.ByteArrayOutputStream(4096)
+    standardOutput = capturedOutput
+    errorOutput = capturedOutput
+    doFirst {
+        capturedOutput.reset()
+    }
+    doLast {
+        File output = layout.buildDirectory.file("reports/j7m/examples/nugget-admin-console-runbook-commands.out").get().asFile
+        output.parentFile.mkdirs()
+        output.setText(capturedOutput.toString("UTF-8"), "UTF-8")
+    }
+}
+
+tasks.register("validateNuggetAdminConsoleExample") {
+    group = "verification"
+    description = "Validates the standalone nugget admin console example structure, compileability, expected output, and smoke backing."
+    dependsOn "runNuggetAdminConsoleRunbookTest"
+    dependsOn ":j7m-tests:phase7NuggetCliDemoEvidence"
+    dependsOn ":j7m-tests:phase7NuggetCliApplicationLifecycleDemoEvidence"
+    dependsOn ":j7m-tests:phase7NuggetCliKillDisabledDemoEvidence"
+    dependsOn ":j7m-tests:phase7NuggetPinFailureDemoEvidence"
+    doLast {
+        File root = file("examples/nugget-admin-console")
+        List<String> requiredFiles = [
+                "README.md",
+                "build.gradle",
+                "EXPECTED_OUTPUT.txt",
+                "src/main/java/module-info.java",
+                "src/main/java/org/j7m/examples/nugget/console/NuggetAdminConsoleRunbook.java",
+                "src/test/java/org/j7m/examples/nugget/console/NuggetAdminConsoleRunbookTest.java"
+        ]
+        requiredFiles.each { String relativePath ->
+            if (!new File(root, relativePath).isFile()) {
+                throw new GradleException("nugget admin console example missing required file: ${relativePath}")
+            }
+        }
+        if (new File(root, "META-INF/j7m-application.json").isFile()) {
+            throw new GradleException("nugget admin console is operator-only and must not include META-INF/j7m-application.json")
+        }
+        String readmeText = new File(root, "README.md").getText("UTF-8")
+        String readmeLower = readmeText.toLowerCase(java.util.Locale.ROOT)
+        if (!readmeLower.contains("not a deployable j7m application bundle")) {
+            throw new GradleException("nugget admin console README must explicitly state that the console is not deployable")
+        }
+        [
+                "manifest is present",
+                "copyable application structure",
+                "deployable hello application",
+                "packages and publishes",
+                "activate the console"
+        ].each { String forbiddenClaim ->
+            if (readmeLower.contains(forbiddenClaim)) {
+                throw new GradleException("nugget admin console README contains stale deployability claim: ${forbiddenClaim}")
+            }
+        }
+        File source = new File(root, "src/main/java/org/j7m/examples/nugget/console/NuggetAdminConsoleRunbook.java")
+        String sourceText = source.getText("UTF-8")
+        if (readmeText.contains("j7m nugget status --id")
+                || sourceText.contains("\"status\", \"--id\"")) {
+            throw new GradleException("nugget admin console status command must not use --id")
+        }
+        File commandEvidence = layout.buildDirectory.file(
+                "reports/j7m/examples/nugget-admin-console-runbook-commands.out").get().asFile
+        if (!commandEvidence.isFile()) {
+            throw new GradleException("nugget admin console runbook command evidence was not generated")
+        }
+        List<String> testedCommands = commandEvidence.readLines("UTF-8").collect { String line ->
+            line.trim()
+        }.findAll { String line ->
+            !line.isEmpty()
+        }
+        if (testedCommands.isEmpty()) {
+            throw new GradleException("nugget admin console runbook command evidence is empty")
+        }
+        testedCommands.each { String command ->
+            if (command.contains("740001")) {
+                throw new GradleException("nugget admin console command evidence exposed literal PIN material")
+            }
+            if (command == "j7m nugget status --id demo-nugget --pin-env J7M_DEMO_PIN"
+                    || command.startsWith("j7m nugget status --id ")) {
+                throw new GradleException("nugget admin console command evidence contains unsupported status --id form")
+            }
+            if (!readmeText.contains(command)) {
+                throw new GradleException("nugget admin console README missing tested runbook command: ${command}")
+            }
+        }
+        List<String> readmeCommands = readmeText.readLines().collect { String line ->
+            line.trim()
+        }.findAll { String line ->
+            line.startsWith("j7m nugget ")
+        }
+        Set<String> readmeCommandSet = readmeCommands as Set
+        Set<String> testedCommandSet = testedCommands as Set
+        if (readmeCommandSet != testedCommandSet) {
+            throw new GradleException("nugget admin console README command forms differ from tested runbook commands")
+        }
+        Map<String, List<String>> evidenceMarkers = [
+                "nugget-cli-demo.out": [
+                        "phase7 nugget cli demo: production-entrypoint",
+                        "phase7 nugget cli inspection commands: ps objects apps env disk health readiness metrics errors",
+                        "phase7 nugget cli exit code: 0",
+                        "phase7 nugget cli all-nugget prompt visible: true",
+                        "phase7 nugget cli discovery visible: true",
+                        "phase7 nugget cli all-nugget target visible: true",
+                        "phase7 nugget cli selected-nugget prompt visible: true",
+                        "phase7 nugget cli selected-nugget target visible: true",
+                        "phase7 nugget cli status command visible: true",
+                        "phase7 nugget cli returned all-nugget mode: true",
+                        "phase7 nugget cli json envelope: true",
+                        "phase7 nugget cli ps output: true",
+                        "phase7 nugget cli no secret leakage: true"
+                ],
+                "nugget-cli-application-lifecycle-demo.out": [
+                        "phase7.6 nugget cli lifecycle demo: real-application-manager",
+                        "phase7.6 nugget cli lifecycle discovery/select/auth: true",
+                        "phase7.6 nugget cli lifecycle start dry-run: true",
+                        "phase7.6 nugget cli lifecycle start exact coordinate: true",
+                        "phase7.6 nugget cli lifecycle apps status: true",
+                        "phase7.6 nugget cli lifecycle drain: true",
+                        "phase7.6 nugget cli lifecycle stop: true",
+                        "phase7.6 nugget cli lifecycle service after stop candidates: 0",
+                        "phase7.6 nugget cli lifecycle unload: true",
+                        "phase7.6 nugget cli lifecycle audit safe redaction: true"
+                ],
+                "nugget-cli-kill-disabled-demo.out": [
+                        "phase7.7 nugget cli kill-disabled demo: public-contracts",
+                        "phase7.7 nugget cli discovery exact target auth: true",
+                        "phase7.7 nugget cli drain safe partial: true",
+                        "phase7.7 nugget cli shutdown confirmation-required: true",
+                        "phase7.7 nugget cli kill disabled despite confirmation: true",
+                        "phase7.7 nugget cli no arbitrary process control: true",
+                        "phase7.7 nugget cli no jvm termination: true",
+                        "phase7.7 nugget cli audit/output safe: true"
+                ],
+                "nugget-pin-failure-demo.out": [
+                        "phase7 nugget pin failure demo: production-cli-entrypoint",
+                        "phase7 nugget pin failure cli exit non-success: true",
+                        "phase7 nugget pin failure cli denial stable: true",
+                        "phase7 nugget pin failure outcome: REJECTED",
+                        "phase7 nugget pin failure accepted: false",
+                        "phase7 nugget pin failure secret printed: false"
+                ]
+        ]
+        File phase7Reports = layout.buildDirectory.dir("reports/j7m/phase7").get().asFile
+        Set<String> allowedExpectedMarkers = [] as Set
+        evidenceMarkers.each { String reportName, List<String> markers ->
+            File report = new File(phase7Reports, reportName)
+            if (!report.isFile()) {
+                throw new GradleException("missing nugget admin console demo evidence report: ${reportName}")
+            }
+            String reportText = report.getText("UTF-8")
+            markers.each { String marker ->
+                allowedExpectedMarkers.add(marker)
+                if (!reportText.contains(marker)) {
+                    throw new GradleException("demo evidence ${reportName} missing expected marker: ${marker}")
+                }
+            }
+        }
+        List<String> expectedOutput = new File(root, "EXPECTED_OUTPUT.txt").readLines("UTF-8").collect { String line ->
+            line.trim()
+        }.findAll { String line ->
+            !line.isEmpty()
+        }
+        allowedExpectedMarkers.each { String marker ->
+            if (!expectedOutput.contains(marker)) {
+                throw new GradleException("nugget admin console expected output missing marker: ${marker}")
+            }
+        }
+        expectedOutput.each { String marker ->
+            if (!allowedExpectedMarkers.contains(marker)) {
+                throw new GradleException("nugget admin console expected output contains untested marker: ${marker}")
+            }
+        }
+        String localBuild = new File(root, "build.gradle").getText("UTF-8")
+        if (localBuild.contains("smokeNuggetAdminConsoleExample")) {
+            throw new GradleException("nugget admin console example declares a task that is not loaded by the root build")
+        }
+    }
+}
+
+tasks.register("validateNuggetExamples") {
+    group = "verification"
+    description = "Aggregates existing example validation and CLI smoke coverage for Phase 7 nugget examples."
+    dependsOn "validateExamples"
+    dependsOn "validateExampleReadmes"
+    dependsOn "validateNuggetAdminConsoleExample"
+}
+
+tasks.register("validateNuggetDocs") {
+    group = "verification"
+    description = "Aggregates existing documentation validation for Phase 7 nugget demos and examples."
+    dependsOn "validateExampleReadmes"
+    dependsOn "validateExampleJavadocs"
+    dependsOn "validateExampleSourceDocumentation"
+    dependsOn "validatePublicApiDocs"
+    dependsOn "validateJavadocs"
+}
+
+tasks.register("buildExamples") {
+    group = "verification"
+    description = "Builds all supported example backing modules and jars."
+    dependsOn "validateRequiredExampleFiles"
+    dependsOn "validateAnnotationExamples"
+    dependsOn "validateExampleJavadocs"
+    dependsOn "validateExampleSourceDocumentation"
+    dependsOn ":j7m-examples:build"
+    dependsOn ":examples:modular-hello-api:build"
+    dependsOn ":examples:modular-hello-impl:build"
+}
+
+tasks.register("packageExamples") {
+    group = "verification"
+    description = "Packages deployable examples through executable demo packaging paths."
+    dependsOn ":j7m-demo:runApplicationDeploymentDemo"
+    dependsOn ":j7m-demo:runModularApplicationDeploymentDemo"
+    dependsOn ":j7m-demo:runHelloRemoteServiceExample"
+    dependsOn ":j7m-demo:runSecureBankingWorkflowExample"
+    dependsOn ":j7m-demo:runWorkloadProcessingExample"
+    dependsOn ":j7m-demo:runStreamingPipelineExample"
+    dependsOn ":j7m-demo:runRegulatedEnterpriseAppExample"
+    dependsOn ":j7m-demo:runAnnotationModelDemo"
+}
+
+tasks.register("j7mPackage") {
+    group = "j7m"
+    description = "Packages the default hello remote service example into a .j7m bundle."
+    dependsOn ":j7m-demo:runHelloRemoteServiceExample"
+}
+
+tasks.register("j7mSign") {
+    group = "j7m"
+    description = "Signs the default packaged J7M example bundle with the local development Ed25519 key."
+    dependsOn "j7mPackage"
+    dependsOn ":j7m-demo:runRegulatedEnterpriseAppExample"
+}
+
+tasks.register("j7mVerify") {
+    group = "j7m"
+    description = "Verifies the default packaged J7M example bundle."
+    dependsOn "j7mSign"
+    dependsOn "verifyExamples"
+}
+
+tasks.register("j7mDeployLocal") {
+    group = "j7m"
+    description = "Publishes the default packaged J7M example to a local repository through the demo deployer path."
+    dependsOn "j7mVerify"
+    dependsOn ":j7m-demo:runApplicationDeploymentDemo"
+}
+
+tasks.register("j7mRunLocal") {
+    group = "j7m"
+    description = "Activates and invokes the default local J7M example application."
+    dependsOn "j7mDeployLocal"
+    dependsOn ":j7m-demo:runHelloRemoteServiceExample"
+}
+
+tasks.register("j7mPlanLocal") {
+    group = "j7m"
+    description = "Runs a dry-run local activation plan for the default J7M example application."
+    dependsOn "j7mDeployLocal"
+    dependsOn ":j7m-demo:runApplicationDeploymentDemo"
+}
+
+tasks.register("j7mStatusLocal") {
+    group = "j7m"
+    description = "Prints safe local J7M application status for the default workflow."
+    dependsOn "j7mRunLocal"
+    dependsOn ":j7m-demo:runApplicationAdminStatusDemo"
+}
+
+tasks.register("j7mStopLocal") {
+    group = "j7m"
+    description = "Stops the default local J7M application workflow."
+    dependsOn "j7mStatusLocal"
+    dependsOn ":j7m-demo:runApplicationDeploymentDemo"
+}
+
+tasks.register("j7mUnloadLocal") {
+    group = "j7m"
+    description = "Unloads the default local J7M application workflow and preserves historical status."
+    dependsOn "j7mStopLocal"
+    dependsOn ":j7m-demo:runApplicationDeploymentDemo"
+}
+
+tasks.register("verifyExamples") {
+    group = "verification"
+    description = "Runs example validation tests, README checks, and bundle verification coverage."
+    dependsOn "validateExamples"
+    dependsOn "runExamplesSmoke"
+    dependsOn ":j7m-tests:phase5ApplicationPlatformTest"
+}

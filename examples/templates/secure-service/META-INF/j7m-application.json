@@ -1,0 +1,45 @@
+{
+  "schemaVersion": "j7m.application/v1",
+  "application": {
+    "group": "com.example",
+    "name": "secure-service",
+    "version": "1.0.0",
+    "displayName": "Secure Service",
+    "description": "Template for role-protected JPMS service"
+  },
+  "runtime": {
+    "minJ7mVersion": "0.5.5",
+    "javaVersion": "25",
+    "moduleMode": "JPMS",
+    "bootstrapClass": "com.example.secure.SecureApplication",
+    "bootstrapModule": "com.example.secure"
+  },
+  "modules": [
+    {
+      "name": "com.example.secure",
+      "path": "modules/com.example.secure.jar"
+    }
+  ],
+  "services": [
+    {
+      "serviceName": "//apps/example/secure/SecureService",
+      "interfaceName": "com.example.secure.SecureService",
+      "implementationClass": "com.example.secure.SecureServiceImpl",
+      "transport": "grpc",
+      "globallyExported": true,
+      "metadata": {
+        "template": "secure-service"
+      }
+    }
+  ],
+  "security": {
+    "trustDomain": "dev",
+    "confidential": true
+  },
+  "resources": {
+    "cpu": "1",
+    "memory": "256MiB",
+    "maxConcurrentInvocations": 16,
+    "maxInboundPayload": "1MiB"
+  }
+}

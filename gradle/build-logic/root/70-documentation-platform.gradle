@@ -1,0 +1,206 @@
+// Copyright (c) 2026, Leo Galambos and the Egothor team
+// https://www.egothor.org
+// SPDX-License-Identifier: BSD-4-Clause
+// Licensed under the BSD 4-Clause License; see LICENSE for the full terms.
+// This product includes software developed by Leo Galambos and the Egothor
+// team (https://www.egothor.org).
+
+/*
+ * Purpose: builds, validates, serves, and packages the public
+ * MkDocs Material documentation platform.
+ * Owns: documentation environment bootstrapping, strict MkDocs site generation,
+ * public documentation validators, local serve task, and deterministic preview archive.
+ * Must not own: Java production behavior, public APIs, persistent formats,
+ * examples, manifests, generated public books, deployment publication, or internal records.
+ * Root rationale: the public documentation site is a repository-level product
+ * surface assembled from root configuration, public documentation sources, and
+ * validation scripts rather than a module-local Java artifact.
+ * Related validation tasks: validateDocumentationStructure, validateDocumentationLinks,
+ * validateDocumentationSnippets, validateDocumentationExamples, validateDocumentationSecurity,
+ * validateDocumentationBoundary, validateDocumentationHomepage, validateDocumentationTooling,
+ * validateDocumentation.
+ */
+
+import java.security.MessageDigest
+
+String documentationPythonExecutable = providers.gradleProperty("documentationPython")
+        .orElse(providers.environmentVariable("J7M_DOCUMENTATION_PYTHON"))
+        .orElse("python3")
+        .get()
+File documentationBuildDir = layout.buildDirectory.dir("documentation").get().asFile
+File documentationVenvDir = new File(documentationBuildDir, "venv")
+File documentationSiteDir = layout.buildDirectory.dir("documentation/site").get().asFile
+File documentationReportsDir = layout.buildDirectory.dir("reports/documentation").get().asFile
+File documentationRequirementsFile = file("documentation/requirements.txt")
+String documentationPlatformOs = System.getProperty("os.name").toLowerCase(Locale.ROOT)
+boolean documentationPlatformWindows = documentationPlatformOs.contains("win")
+File documentationVenvPython = new File(documentationVenvDir, documentationPlatformWindows ? "Scripts/python.exe" : "bin/python")
+File documentationVenvMkdocs = new File(documentationVenvDir, documentationPlatformWindows ? "Scripts/mkdocs.exe" : "bin/mkdocs")
+File documentationVenvMarker = new File(documentationVenvDir, ".j7m-documentation-env")
+
+Closure<String> documentationSha256 = { File input ->
+    MessageDigest digest = MessageDigest.getInstance("SHA-256")
+    input.withInputStream { InputStream stream ->
+        byte[] buffer = new byte[8192]
+        int read = stream.read(buffer)
+        while (read >= 0) {
+            if (read > 0) {
+                digest.update(buffer, 0, read)
+            }
+            read = stream.read(buffer)
+        }
+    }
+    char[] hex = "0123456789abcdef".toCharArray()
+    byte[] bytes = digest.digest()
+    StringBuilder builder = new StringBuilder(bytes.length * 2)
+    for (byte item : bytes) {
+        int value = item & 0xff
+        builder.append(hex[value >>> 4])
+        builder.append(hex[value & 0x0f])
+    }
+    return builder.toString()
+}
+
+Closure<List<String>> documentationPythonIdentity = { String pythonExecutable ->
+    String output = providers.exec {
+        commandLine pythonExecutable, "-c", "import platform,sys; print(sys.executable); print(platform.python_implementation()); print(platform.python_version())"
+    }.standardOutput.asText.get()
+    List<String> lines = output.readLines()
+    if (lines.size() != 3) {
+        throw new GradleException("documentation Python identity probe returned ${lines.size()} lines")
+    }
+    return lines
+}
+
+Closure<String> documentationExpectedMarker = {
+    List<String> identity = documentationPythonIdentity(documentationPythonExecutable)
+    return [
+            "requirementsSha256=${documentationSha256(documentationRequirementsFile)}",
+            "pythonCommand=${documentationPythonExecutable}",
+            "pythonExecutable=${identity[0]}",
+            "pythonImplementation=${identity[1]}",
+            "pythonVersion=${identity[2]}"
+    ].join("\n") + "\n"
+}
+
+tasks.register("bootstrapDocumentationEnvironment") {
+    group = "documentation"
+    description = "Creates the pinned MkDocs documentation virtual environment."
+    inputs.file(documentationRequirementsFile)
+    inputs.property("documentationPython", documentationPythonExecutable)
+    outputs.dir(documentationVenvDir)
+    doLast {
+        String expectedMarker = documentationExpectedMarker()
+        if (documentationVenvDir.exists() && (!documentationVenvMarker.isFile()
+                || documentationVenvMarker.getText("UTF-8") != expectedMarker)) {
+            delete documentationVenvDir
+        }
+        if (!documentationVenvPython.isFile()) {
+            providers.exec {
+                commandLine documentationPythonExecutable, "-m", "venv", documentationVenvDir.absolutePath
+            }.result.get().assertNormalExitValue()
+        }
+        providers.exec {
+            commandLine documentationVenvPython.absolutePath, "-m", "pip", "--disable-pip-version-check",
+                    "install", "--requirement", documentationRequirementsFile.absolutePath
+        }.result.get().assertNormalExitValue()
+        documentationVenvMarker.parentFile.mkdirs()
+        documentationVenvMarker.setText(expectedMarker, "UTF-8")
+    }
+}
+
+tasks.register("cleanDocumentation", Delete) {
+    group = "documentation"
+    description = "Removes generated documentation site, reports, preview archives, and virtual environment."
+    delete documentationBuildDir
+    delete documentationReportsDir
+    delete layout.buildDirectory.file("distributions/j7m-documentation-preview.zip")
+}
+
+tasks.register("buildDocumentation", Exec) {
+    group = "documentation"
+    description = "Builds the public MkDocs site in strict mode."
+    dependsOn "bootstrapDocumentationEnvironment"
+    inputs.file("documentation/mkdocs.yml")
+    inputs.dir("documentation/docs")
+    inputs.dir("documentation/data")
+    inputs.dir("documentation/examples/src")
+    inputs.dir("documentation/overrides")
+    inputs.files(fileTree(rootDir) {
+        include "**/src/**/*.java"
+        exclude "**/build/**", "INBOX/**"
+    })
+    outputs.dir(documentationSiteDir)
+    commandLine documentationVenvMkdocs.absolutePath, "build", "--strict", "--config-file", "documentation/mkdocs.yml", "--site-dir", documentationSiteDir.absolutePath
+    doLast {
+        delete new File(documentationSiteDir, "sitemap.xml.gz")
+    }
+}
+
+tasks.register("serveDocumentation", Exec) {
+    group = "documentation"
+    description = "Serves the public MkDocs site locally for authoring previews."
+    dependsOn "bootstrapDocumentationEnvironment"
+    commandLine documentationVenvMkdocs.absolutePath, "serve", "--config-file", "documentation/mkdocs.yml"
+}
+
+Closure<Void> registerDocumentationValidator = { String taskName, String validatorName, boolean requiresBuiltSite ->
+    tasks.register(taskName, Exec) {
+        group = "verification"
+        description = "Runs the ${validatorName} public documentation validator."
+        if (requiresBuiltSite) {
+            dependsOn "buildDocumentation"
+        }
+        commandLine documentationPythonExecutable, "scripts/docs/validate_public_documentation.py", validatorName
+    }
+}
+
+registerDocumentationValidator("validateDocumentationStructure", "structure", false)
+registerDocumentationValidator("validateDocumentationLinks", "links", false)
+registerDocumentationValidator("validateDocumentationSnippets", "snippets", true)
+registerDocumentationValidator("validateDocumentationExamples", "examples", false)
+registerDocumentationValidator("validateDocumentationSecurity", "security", true)
+registerDocumentationValidator("validateDocumentationBoundary", "boundary", true)
+registerDocumentationValidator("validateDocumentationHomepage", "homepage", true)
+registerDocumentationValidator("validateDocumentationProductOverview", "product-overview", false)
+registerDocumentationValidator("validateDocumentationProgrammerGuides", "programmer-guides", true)
+
+tasks.register("validateDocumentationTooling") {
+    group = "verification"
+    description = "Validates documentation tooling files and runs validator unit tests."
+    doLast {
+        providers.exec {
+            commandLine documentationPythonExecutable, "scripts/docs/validate_public_documentation.py", "tooling"
+        }.result.get().assertNormalExitValue()
+        providers.exec {
+            commandLine documentationPythonExecutable, "-m", "unittest", "scripts.docs.test_validate_public_documentation"
+        }.result.get().assertNormalExitValue()
+    }
+}
+
+tasks.register("validateDocumentation") {
+    group = "verification"
+    description = "Runs the complete public documentation validation graph."
+    dependsOn "validateDocumentationStructure"
+    dependsOn "validateDocumentationLinks"
+    dependsOn "validateDocumentationSnippets"
+    dependsOn "validateDocumentationExamples"
+    dependsOn "validateDocumentationSecurity"
+    dependsOn "validateDocumentationBoundary"
+    dependsOn "validateDocumentationHomepage"
+    dependsOn "validateDocumentationProductOverview"
+    dependsOn "validateDocumentationProgrammerGuides"
+    dependsOn "validateDocumentationTooling"
+}
+
+tasks.register("packageDocumentationPreview", Zip) {
+    group = "documentation"
+    description = "Packages the rendered public documentation site as a deterministic preview archive."
+    dependsOn "buildDocumentation"
+    dependsOn "validateDocumentation"
+    archiveFileName = "j7m-documentation-preview.zip"
+    destinationDirectory = layout.buildDirectory.dir("distributions")
+    from(documentationSiteDir)
+    reproducibleFileOrder = true
+    preserveFileTimestamps = false
+}

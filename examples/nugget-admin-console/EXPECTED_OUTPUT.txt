@@ -1,0 +1,37 @@
+phase7 nugget cli demo: production-entrypoint
+phase7 nugget cli inspection commands: ps objects apps env disk health readiness metrics errors
+phase7 nugget cli exit code: 0
+phase7 nugget cli all-nugget prompt visible: true
+phase7 nugget cli discovery visible: true
+phase7 nugget cli all-nugget target visible: true
+phase7 nugget cli selected-nugget prompt visible: true
+phase7 nugget cli selected-nugget target visible: true
+phase7 nugget cli status command visible: true
+phase7 nugget cli returned all-nugget mode: true
+phase7 nugget cli json envelope: true
+phase7 nugget cli ps output: true
+phase7 nugget cli no secret leakage: true
+phase7.6 nugget cli lifecycle demo: real-application-manager
+phase7.6 nugget cli lifecycle discovery/select/auth: true
+phase7.6 nugget cli lifecycle start dry-run: true
+phase7.6 nugget cli lifecycle start exact coordinate: true
+phase7.6 nugget cli lifecycle apps status: true
+phase7.6 nugget cli lifecycle drain: true
+phase7.6 nugget cli lifecycle stop: true
+phase7.6 nugget cli lifecycle service after stop candidates: 0
+phase7.6 nugget cli lifecycle unload: true
+phase7.6 nugget cli lifecycle audit safe redaction: true
+phase7.7 nugget cli kill-disabled demo: public-contracts
+phase7.7 nugget cli discovery exact target auth: true
+phase7.7 nugget cli drain safe partial: true
+phase7.7 nugget cli shutdown confirmation-required: true
+phase7.7 nugget cli kill disabled despite confirmation: true
+phase7.7 nugget cli no arbitrary process control: true
+phase7.7 nugget cli no jvm termination: true
+phase7.7 nugget cli audit/output safe: true
+phase7 nugget pin failure demo: production-cli-entrypoint
+phase7 nugget pin failure cli exit non-success: true
+phase7 nugget pin failure cli denial stable: true
+phase7 nugget pin failure outcome: REJECTED
+phase7 nugget pin failure accepted: false
+phase7 nugget pin failure secret printed: false

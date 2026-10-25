@@ -1,0 +1,38 @@
+{
+  "schemaVersion": "j7m.application/v1",
+  "application": {
+    "group": "com.example",
+    "name": "workload-app",
+    "version": "1.0.0",
+    "displayName": "Workload App",
+    "description": "Template placeholder for workload-integrated applications"
+  },
+  "runtime": {
+    "minJ7mVersion": "0.5.5",
+    "javaVersion": "25",
+    "moduleMode": "CLASSPATH",
+    "bootstrapClass": "com.example.workload.WorkloadApplication"
+  },
+  "services": [
+    {
+      "serviceName": "//apps/example/workload/WorkloadFacade",
+      "interfaceName": "com.example.workload.WorkloadFacade",
+      "implementationClass": "com.example.workload.WorkloadFacadeImpl",
+      "transport": "grpc",
+      "globallyExported": true,
+      "metadata": {
+        "template": "workload-app"
+      }
+    }
+  ],
+  "security": {
+    "trustDomain": "dev",
+    "confidential": false
+  },
+  "resources": {
+    "cpu": "1",
+    "memory": "512MiB",
+    "maxConcurrentInvocations": 8,
+    "maxInboundPayload": "1MiB"
+  }
+}

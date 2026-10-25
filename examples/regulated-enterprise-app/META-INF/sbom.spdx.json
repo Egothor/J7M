@@ -1,0 +1,15 @@
+{
+  "spdxVersion": "SPDX-2.3",
+  "dataLicense": "CC0-1.0",
+  "SPDXID": "SPDXRef-DOCUMENT",
+  "name": "j7m-regulated-enterprise-example",
+  "documentNamespace": "https://j7m.example.local/sbom/regulated-enterprise-app",
+  "packages": [
+    {
+      "name": "j7m-examples",
+      "SPDXID": "SPDXRef-Package-j7m-examples",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false
+    }
+  ]
+}

@@ -1,0 +1,90 @@
+/*
+ * BSD 4-Clause License
+ *
+ * Copyright (c) 2026, Leo Galambos and the Egothor team
+ * Website of the Egothor team: https://www.egothor.org
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
+ * met:
+ *
+ * 1. Redistributions of source code must retain the above copyright
+ * notice, this list of conditions and the following disclaimer.
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright
+ * notice, this list of conditions and the following disclaimer in the
+ * documentation and/or other materials provided with the distribution.
+ *
+ * 3. All advertising materials mentioning features or use of this
+ * software must display the following acknowledgement:
+ *
+ * This product includes software developed by Leo Galambos and the Egothor
+ * team (https://www.egothor.org).
+ *
+ * 4. Neither the name of the copyright holder nor the names of its
+ * contributors may be used to endorse or promote products derived from
+ * this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+ * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+ * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+package org.j7m.middleware.annotations;
+
+import java.lang.annotation.Documented;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+
+/**
+ * Declares an annotation-first managed J7M application entry point.
+ *
+ * <p>The annotation is metadata only: it does not grant registry access,
+ * transport access, or deployment authority. The application platform reads
+ * the values during bundle validation and activation, then supplies safe
+ * capabilities through constructor or field injection. Implementations remain
+ * subject to JPMS readability and {@code opens} rules, security policy, and
+ * resource policy.</p>
+ *
+ * <p>Application classes annotated with this type are expected to be
+ * application-owned objects. They are not singleton runtime internals, and
+ * they must not retain invocation-scoped injected values beyond the current
+ * dispatch.</p>
+ */
+@Documented
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.TYPE)
+public @interface J7mApplication {
+    /**
+     * Returns the application group.
+     *
+     * @return stable application group such as {@code com.acme}
+     */
+    String group();
+
+    /**
+     * Returns the application name.
+     *
+     * @return stable application name
+     */
+    String name();
+
+    /**
+     * Returns the application version.
+     *
+     * @return semantic or deployment-specific application version
+     */
+    String version();
+}
+

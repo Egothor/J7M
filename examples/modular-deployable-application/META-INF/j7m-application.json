@@ -1,0 +1,51 @@
+{
+  "schemaVersion": "j7m.application/v1",
+  "application": {
+    "group": "org.j7m.examples",
+    "name": "modular-hello-service",
+    "version": "1.0.0",
+    "displayName": "Modular Hello Service",
+    "description": "JPMS deployable J7M hello service"
+  },
+  "runtime": {
+    "minJ7mVersion": "0.5.2",
+    "javaVersion": "25",
+    "moduleMode": "JPMS",
+    "bootstrapModule": "com.example.j7m.modular.hello.impl",
+    "bootstrapClass": "com.example.j7m.modular.hello.impl.ModularHelloApplication"
+  },
+  "modules": [
+    {
+      "name": "com.example.j7m.modular.hello.api",
+      "path": "modules/com.example.j7m.modular.hello.api.jar"
+    },
+    {
+      "name": "com.example.j7m.modular.hello.impl",
+      "path": "modules/com.example.j7m.modular.hello.impl.jar"
+    }
+  ],
+  "services": [
+    {
+      "serviceName": "//apps/example/modular/hello/ModularHelloService",
+      "interfaceName": "com.example.j7m.modular.hello.api.ModularHelloService",
+      "implementationClass": "com.example.j7m.modular.hello.impl.ModularHelloServiceImpl",
+      "transport": "grpc",
+      "globallyExported": true,
+      "metadata": {
+        "domain": "example",
+        "classification": "internal",
+        "mode": "jpms"
+      }
+    }
+  ],
+  "security": {
+    "trustDomain": "dev",
+    "confidential": false
+  },
+  "resources": {
+    "cpu": "1",
+    "memory": "256MiB",
+    "maxConcurrentInvocations": 32,
+    "maxInboundPayload": "4MiB"
+  }
+}

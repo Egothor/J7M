@@ -1,0 +1,154 @@
+{
+  "owner": "J7M maintainers",
+  "reviewed": "2026-10-25",
+  "examples": [
+    {
+      "id": "container",
+      "source": "documentation/examples/src/main/java/org/j7m/documentation/ContainerExample.java",
+      "supportingSources": [
+        "documentation/examples/src/main/java/org/j7m/documentation/GreetingComponent.java",
+        "documentation/examples/src/main/java/org/j7m/documentation/GreetingFormatter.java"
+      ],
+      "entryPoint": "org.j7m.documentation.ContainerExample",
+      "verification": "documentationVerify",
+      "basis": [
+        {
+          "source": "j7m-application-platform/src/test/java/org/j7m/middleware/application/components/ManagedContainerTest.java",
+          "method": "constructorThenFieldInjectionPublishesOnlyCompleteProduct"
+        },
+        {
+          "source": "j7m-annotation-processor/src/test/java/org/j7m/middleware/processor/SchemaProcessorTest.java",
+          "method": "componentIndexPreservesOverloadsInheritanceFactoriesAndDirectAccess"
+        }
+      ],
+      "proves": [
+        "actual generated constructor injection",
+        "generated startup and shutdown callbacks",
+        "activation identity",
+        "explicit component graph",
+        "missing dependency rejection"
+      ],
+      "doesNotProve": [
+        "signed application deployment",
+        "remote service refresh",
+        "distributed recovery"
+      ]
+    },
+    {
+      "id": "schema",
+      "source": "documentation/examples/src/main/java/org/j7m/documentation/SchemaExample.java",
+      "supportingSources": [
+        "documentation/examples/src/main/java/org/j7m/documentation/Order.java"
+      ],
+      "entryPoint": "org.j7m.documentation.SchemaExample",
+      "verification": "documentationVerify",
+      "basis": [
+        {
+          "source": "j7m-annotation-processor/src/test/java/org/j7m/middleware/processor/SchemaProcessorTest.java",
+          "method": "standaloneNamedModuleDiscoversProcessorAndRunsWithoutOpens"
+        }
+      ],
+      "proves": [
+        "generated allowlisted schema roundtrip",
+        "explicit schema roundtrip",
+        "unregistered data rejection"
+      ],
+      "doesNotProve": [
+        "schema evolution or migration",
+        "arbitrary Java serialization",
+        "remote class loading"
+      ]
+    },
+    {
+      "id": "runtime",
+      "source": "documentation/examples/src/main/java/org/j7m/documentation/RuntimeExample.java",
+      "entryPoint": "org.j7m.documentation.RuntimeExample",
+      "verification": "documentationVerify",
+      "basis": [
+        {
+          "source": "j7m-tests/src/test/java/org/j7m/middleware/tests/Phase1IntegrationTest.java",
+          "method": "grpcRemoteInvocationPassesCallbackAndReturnReference"
+        }
+      ],
+      "proves": [
+        "actual gRPC between two runtimes",
+        "callback reference conversion",
+        "metadata-filtered discovery"
+      ],
+      "doesNotProve": [
+        "different host discovery",
+        "production transport security",
+        "nugget administration",
+        "process recovery"
+      ]
+    },
+    {
+      "id": "queue",
+      "source": "documentation/examples/src/main/java/org/j7m/documentation/QueueExample.java",
+      "entryPoint": "org.j7m.documentation.QueueExample",
+      "verification": "documentationVerify",
+      "basis": [
+        {
+          "source": "j7m-distributed-core/src/test/java/org/j7m/middleware/distributed/ReplicatedQueueTest.java",
+          "method": "facadeExposesQueueMembershipDeliveryAndQueries"
+        }
+      ],
+      "proves": [
+        "stable publication identity",
+        "request conflict",
+        "claim and receipt-fenced acknowledgment",
+        "reducer snapshot roundtrip"
+      ],
+      "doesNotProve": [
+        "consensus durability",
+        "reactive push",
+        "measured-clock admission",
+        "multi-JVM failure recovery"
+      ]
+    },
+    {
+      "id": "failover",
+      "source": "documentation/examples/src/main/java/org/j7m/documentation/FailoverExample.java",
+      "entryPoint": "org.j7m.documentation.FailoverExample",
+      "verification": "documentationVerify",
+      "basis": [
+        {
+          "source": "j7m-application-platform/src/test/java/org/j7m/middleware/application/components/LiveServiceBindingProcessIT.java",
+          "method": "threeActualServiceJvmsDiscoverNewReplicaRejectUnauthorizedAndFailOverWithoutReplayingEffects"
+        }
+      ],
+      "proves": [
+        "actual public live binding adapters over gRPC",
+        "ON_FAILURE sticky selection versus ON_TOPOLOGY_CHANGE",
+        "watch-based new replica discovery and subsequent-call failover",
+        "entered business failure is not replayed"
+      ],
+      "doesNotProve": [
+        "different JVM discovery",
+        "cross-host transport",
+        "production authentication",
+        "forced process termination"
+      ]
+    }
+  ],
+  "unchangedIntegrationProofs": [
+    {
+      "source": "j7m-application-distributed/src/test/java/org/j7m/middleware/application/distributed/ManagedQueueGeneratedIT.java",
+      "method": "generatedCallbackHasPreconstructorGuardIdentityAndActualTrackedTraceOverThreeVoterPush",
+      "task": "documentationIntegration",
+      "proves": "actual generated queue worker through three-voter push with policy identity, owned child work, trace and payload schema checks"
+    },
+    {
+      "source": "j7m-application-distributed/src/test/java/org/j7m/middleware/application/distributed/ManagedJobGeneratedIT.java",
+      "method": "generatedProviderCheckpointProgressAndFreshRestoreUseActualNativeOwnershipAndPhysicalCompletion",
+      "task": "documentationIntegration",
+      "proves": "actual generated job provider, checkpoint/progress and owned physical completion over native execution ownership"
+    },
+    {
+      "source": "j7m-application-distributed/src/test/java/org/j7m/middleware/application/distributed/ManagedSagaGeneratedIT.java",
+      "method": "actualGeneratedSagaRejectsMissingBackendPolicyAndAdministrationBeforeConstructorsThenRunsAndCompensates",
+      "task": "documentationIntegration",
+      "proves": "actual generated saga host, missing backend/policy rejection and compensation"
+    }
+  ]
+}

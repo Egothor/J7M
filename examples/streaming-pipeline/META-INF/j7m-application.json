@@ -1,0 +1,40 @@
+{
+  "schemaVersion": "j7m.application/v1",
+  "application": {
+    "group": "org.j7m.examples",
+    "name": "streaming-pipeline",
+    "version": "1.0.0",
+    "displayName": "Streaming Pipeline",
+    "description": "Deployable bounded batch streaming pattern example"
+  },
+  "runtime": {
+    "minJ7mVersion": "0.5.6",
+    "javaVersion": "25",
+    "moduleMode": "CLASSPATH",
+    "bootstrapClass": "org.j7m.middleware.examples.streaming.StreamingPipelineApplication"
+  },
+  "services": [
+    {
+      "serviceName": "//apps/example/streaming/PipelineService",
+      "interfaceName": "org.j7m.middleware.examples.streaming.StreamingPipelineService",
+      "implementationClass": "org.j7m.middleware.examples.streaming.StreamingPipelineServiceImpl",
+      "transport": "grpc",
+      "globallyExported": true,
+      "metadata": {
+        "domain": "example",
+        "classification": "internal",
+        "example": "streaming-pipeline"
+      }
+    }
+  ],
+  "security": {
+    "trustDomain": "dev",
+    "confidential": false
+  },
+  "resources": {
+    "cpu": "1",
+    "memory": "256MiB",
+    "maxConcurrentInvocations": 16,
+    "maxInboundPayload": "1MiB"
+  }
+}

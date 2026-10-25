@@ -1,0 +1,61 @@
+// Copyright (c) 2026, Leo Galambos and the Egothor team
+// https://www.egothor.org
+// SPDX-License-Identifier: BSD-4-Clause
+// Licensed under the BSD 4-Clause License; see LICENSE for the full terms.
+// This product includes software developed by Leo Galambos and the Egothor
+// team (https://www.egothor.org).
+
+pluginManagement {
+    repositories {
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        maven {
+            name = 'integrationCentralMirror'
+            url = uri('https://repo1.maven.org/maven2')
+            content { includeGroup 'io.opentelemetry'; includeGroup 'com.h2database' }
+        }
+        mavenCentral()
+    }
+}
+
+rootProject.name = "j7m"
+
+include "j7m-api"
+include "j7m-kernel"
+include "j7m-runtime"
+include "j7m-durable-log"
+include "j7m-messaging"
+include "j7m-coordination"
+include "j7m-consensus"
+include "j7m-distributed-core"
+include "j7m-saga"
+include "j7m-isolation"
+include "j7m-adapter-spi"
+include "j7m-adapter-tck"
+include "j7m-transport-grpc"
+include "j7m-transport-rmi"
+include "j7m-application-platform"
+include "j7m-deployer-cli"
+include "j7m-gradle-plugin"
+include "j7m-testkit"
+include "j7m-tests"
+include "j7m-demo"
+include "j7m-examples"
+
+include "examples:modular-hello-api"
+include "examples:modular-hello-impl"
+project(":examples:modular-hello-api").projectDir = file("examples/modular-deployable-application/api")
+project(":examples:modular-hello-impl").projectDir = file("examples/modular-deployable-application/impl")
+include "j7m-integrations"
+
+include "j7m-cluster-management"
+
+include("j7m-annotation-processor")
+
+include "j7m-application-distributed"

@@ -1,0 +1,97 @@
+// Copyright (c) 2026, Leo Galambos and the Egothor team
+// https://www.egothor.org
+// SPDX-License-Identifier: BSD-4-Clause
+// Licensed under the BSD 4-Clause License; see LICENSE for the full terms.
+// This product includes software developed by Leo Galambos and the Egothor
+// team (https://www.egothor.org).
+
+syntax = "proto3";
+
+package org.j7m.middleware.transport.grpc;
+
+message ObjectRefMessage {
+  string object_id = 1;
+  string logical_name = 2;
+  string service_name = 3;
+  string runtime_id = 4;
+  string registry_context = 5;
+  repeated string interfaces = 6;
+  string transport = 7;
+  string endpoint = 8;
+  int64 lease_until = 9;
+  int64 generation = 10;
+  map<string, string> metadata = 11;
+}
+
+message MethodDescriptorMessage {
+  string declaring_interface_name = 1;
+  string method_name = 2;
+  repeated string parameter_type_names = 3;
+  string return_type_name = 4;
+  string signature_hash = 5;
+}
+
+message EncodedValueMessage {
+  string kind = 1;
+  string type_name = 2;
+  string string_value = 3;
+  bytes bytes_value = 4;
+  bool bool_value = 5;
+  int64 long_value = 6;
+  double double_value = 7;
+  ObjectRefMessage object_ref_value = 8;
+  repeated EncodedValueMessage list_values = 9;
+  map<string, EncodedValueMessage> map_values = 10;
+  map<string, string> string_map_value = 11;
+}
+
+message RemoteErrorMessage {
+  string code = 1;
+  string message = 2;
+  map<string, string> details = 3;
+  string invocation_id = 4;
+  string remote_runtime_id = 5;
+  bool retryable = 6;
+  bool dirty_target = 7;
+}
+
+message InvokeRequest {
+  ObjectRefMessage target = 1;
+  MethodDescriptorMessage method = 2;
+  repeated EncodedValueMessage arguments = 3;
+  string invocation_id = 4;
+  int64 deadline_millis = 5;
+  map<string, string> metadata = 6;
+}
+
+message InvokeResponse {
+  bool success = 1;
+  EncodedValueMessage return_value = 2;
+  RemoteErrorMessage error = 3;
+}
+
+message OpenRequest {
+  ObjectRefMessage target = 1;
+  string interface_name = 2;
+}
+
+message OpenResponse {
+  bool success = 1;
+  RemoteErrorMessage error = 2;
+}
+
+message DescribeRequest {
+  ObjectRefMessage target = 1;
+}
+
+message DescribeResponse {
+  bool success = 1;
+  repeated string interfaces = 2;
+  RemoteErrorMessage error = 3;
+}
+
+service RemoteObjectService {
+  rpc Invoke(InvokeRequest) returns (InvokeResponse);
+  rpc Open(OpenRequest) returns (OpenResponse);
+  rpc Describe(DescribeRequest) returns (DescribeResponse);
+}

@@ -1,0 +1,38 @@
+{
+  "schemaVersion": "j7m.application/v1",
+  "application": {
+    "group": "com.example",
+    "name": "simple-service",
+    "version": "1.0.0",
+    "displayName": "Simple Service",
+    "description": "Template for a classpath J7M service"
+  },
+  "runtime": {
+    "minJ7mVersion": "0.5.5",
+    "javaVersion": "25",
+    "moduleMode": "CLASSPATH",
+    "bootstrapClass": "com.example.simple.SimpleApplication"
+  },
+  "services": [
+    {
+      "serviceName": "//apps/example/simple/SimpleService",
+      "interfaceName": "com.example.simple.SimpleService",
+      "implementationClass": "com.example.simple.SimpleServiceImpl",
+      "transport": "grpc",
+      "globallyExported": true,
+      "metadata": {
+        "template": "simple-service"
+      }
+    }
+  ],
+  "security": {
+    "trustDomain": "dev",
+    "confidential": false
+  },
+  "resources": {
+    "cpu": "1",
+    "memory": "256MiB",
+    "maxConcurrentInvocations": 16,
+    "maxInboundPayload": "1MiB"
+  }
+}

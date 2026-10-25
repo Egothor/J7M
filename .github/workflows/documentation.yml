@@ -1,0 +1,23 @@
+# Copyright (c) 2026, Leo Galambos and the Egothor team
+# SPDX-License-Identifier: BSD-4-Clause
+# Licensed under the BSD 4-Clause License; see LICENSE for the full terms.
+name: Publish project documentation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'documentation/**'
+      - 'LICENSE'
+      - '.github/workflows/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/publish-pages.yml

@@ -1,0 +1,6 @@
+{
+  "group": "org.j7m.examples",
+  "name": "annotation-remote-invocation",
+  "version": "1.0.0",
+  "mainClass": "org.j7m.examples.annotation.remote.RemoteInvocationApplication"
+}

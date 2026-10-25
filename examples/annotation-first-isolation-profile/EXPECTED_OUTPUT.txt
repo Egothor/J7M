@@ -1,0 +1,2 @@
+annotation-first isolation profile: baseline-process descriptor-only
+annotation-first isolation redaction: rendered=<redacted>

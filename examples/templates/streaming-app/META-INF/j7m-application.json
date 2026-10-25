@@ -1,0 +1,38 @@
+{
+  "schemaVersion": "j7m.application/v1",
+  "application": {
+    "group": "com.example",
+    "name": "streaming-app",
+    "version": "1.0.0",
+    "displayName": "Streaming App",
+    "description": "Template placeholder for streaming applications"
+  },
+  "runtime": {
+    "minJ7mVersion": "0.5.5",
+    "javaVersion": "25",
+    "moduleMode": "CLASSPATH",
+    "bootstrapClass": "com.example.streaming.StreamingApplication"
+  },
+  "services": [
+    {
+      "serviceName": "//apps/example/streaming/StreamingFacade",
+      "interfaceName": "com.example.streaming.StreamingFacade",
+      "implementationClass": "com.example.streaming.StreamingFacadeImpl",
+      "transport": "grpc",
+      "globallyExported": true,
+      "metadata": {
+        "template": "streaming-app"
+      }
+    }
+  ],
+  "security": {
+    "trustDomain": "dev",
+    "confidential": false
+  },
+  "resources": {
+    "cpu": "1",
+    "memory": "512MiB",
+    "maxConcurrentInvocations": 8,
+    "maxInboundPayload": "1MiB"
+  }
+}

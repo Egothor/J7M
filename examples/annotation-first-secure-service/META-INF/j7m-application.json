@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "j7m.application/v1",
+  "application": {
+    "group": "org.j7m.examples",
+    "name": "annotation-first-secure-service",
+    "version": "1.0.0",
+    "displayName": "Annotation First Secure Service",
+    "description": "Annotation and injection first secure service example"
+  },
+  "runtime": {
+    "minJ7mVersion": "0.6.11",
+    "javaVersion": "25",
+    "moduleMode": "CLASSPATH",
+    "bootstrapClass": "org.j7m.middleware.examples.annotation.AnnotationExampleApplication"
+  },
+  "security": {
+    "trustDomain": "dev",
+    "confidential": true
+  }
+}

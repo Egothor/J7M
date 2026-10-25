@@ -1,0 +1,15 @@
+// Copyright (c) 2026, Leo Galambos and the Egothor team
+// https://www.egothor.org
+// SPDX-License-Identifier: BSD-4-Clause
+// Licensed under the BSD 4-Clause License; see LICENSE for the full terms.
+// This product includes software developed by Leo Galambos and the Egothor
+// team (https://www.egothor.org).
+
+tasks.withType(Javadoc).configureEach {
+    failOnError = true
+    options.addBooleanOption("Xdoclint:all", true)
+    options.addBooleanOption("Werror", true)
+}
+
+ext.j7mConventionPurpose = "Strict Javadoc convention with doclint and warnings-as-errors for all Java modules."
+ext.j7mConventionKind = "shared-configuration"

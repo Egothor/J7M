@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="420" viewBox="0 0 960 420" role="img" aria-labelledby="title desc">
+<title id="title">Applications, discovery and durable resources</title><desc id="desc">Two JVMs communicate using references discovered through their configured registries; optional resource groups provide separate durable state.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 10 5 0 10Z" fill="#2587b6"/></marker></defs>
+<rect x="1" y="1" width="958" height="418" rx="16" fill="#f3f8fc" stroke="#d9e6ee"/>
+<text x="30" y="37" fill="#071a2c" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="700">Applications, discovery and durable resources</text>
+<path d="M270 145H360" fill="none" stroke="#2587b6" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="315" y="130" text-anchor="middle" fill="#235775" font-family="Segoe UI,Arial,sans-serif" font-size="13">invoke</text>
+<path d="M625 145H715" fill="none" stroke="#2587b6" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="670" y="130" text-anchor="middle" fill="#235775" font-family="Segoe UI,Arial,sans-serif" font-size="13">resource API</text>
+<path d="M150 200V310H360" fill="none" stroke="#2587b6" stroke-width="2" marker-end="url(#arrow)" stroke-dasharray="6 5"/>
+<text x="235" y="296" text-anchor="middle" fill="#235775" font-family="Segoe UI,Arial,sans-serif" font-size="13">discover</text>
+<path d="M490 270V200" marker-start="url(#arrow)" fill="none" stroke="#2587b6" stroke-width="2" marker-end="url(#arrow)" stroke-dasharray="6 5"/>
+<text x="552" y="238" text-anchor="middle" fill="#235775" font-family="Segoe UI,Arial,sans-serif" font-size="13">publish / query</text>
+<rect x="30" y="90" width="240" height="110" rx="10" fill="white" stroke="#9fbdcf" stroke-width="1.4"/><rect x="30" y="90" width="240" height="7" rx="3" fill="#efc45c"/><text x="46" y="122" fill="#0b263e" font-family="Segoe UI,Arial,sans-serif" font-size="16" font-weight="700">Application JVM A</text>
+<text x="46" y="147" fill="#3e5d73" font-family="Segoe UI,Arial,sans-serif" font-size="14">Java interfaces and proxies</text>
+<text x="46" y="168" fill="#3e5d73" font-family="Segoe UI,Arial,sans-serif" font-size="14">Local or managed components</text>
+<rect x="360" y="90" width="265" height="110" rx="10" fill="white" stroke="#9fbdcf" stroke-width="1.4"/><rect x="360" y="90" width="265" height="7" rx="3" fill="#efc45c"/><text x="376" y="122" fill="#0b263e" font-family="Segoe UI,Arial,sans-serif" font-size="16" font-weight="700">Application JVM B</text>
+<text x="376" y="147" fill="#3e5d73" font-family="Segoe UI,Arial,sans-serif" font-size="14">Runtime / Nugget host</text>
+<text x="376" y="168" fill="#3e5d73" font-family="Segoe UI,Arial,sans-serif" font-size="14">Validated policies and adapters</text>
+<rect x="715" y="90" width="215" height="110" rx="10" fill="white" stroke="#9fbdcf" stroke-width="1.4"/><rect x="715" y="90" width="215" height="7" rx="3" fill="#efc45c"/><text x="731" y="122" fill="#0b263e" font-family="Segoe UI,Arial,sans-serif" font-size="16" font-weight="700">Resource group</text>
+<text x="731" y="147" fill="#3e5d73" font-family="Segoe UI,Arial,sans-serif" font-size="14">Quorum-backed state</text>
+<text x="731" y="168" fill="#3e5d73" font-family="Segoe UI,Arial,sans-serif" font-size="14">Explicit host-owned clients</text>
+<rect x="360" y="270" width="265" height="80" rx="10" fill="white" stroke="#9fbdcf" stroke-width="1.4"/><rect x="360" y="270" width="265" height="7" rx="3" fill="#efc45c"/><text x="376" y="302" fill="#0b263e" font-family="Segoe UI,Arial,sans-serif" font-size="16" font-weight="700">Registry discovery</text>
+<text x="376" y="327" fill="#3e5d73" font-family="Segoe UI,Arial,sans-serif" font-size="14">Local, multicast or TLS seeds</text>
+<text x="30" y="395" fill="#466174" font-family="Segoe UI,Arial,sans-serif" font-size="13">Built-in gRPC/RMI advertise loopback; cross-host application calls need routable transport integration.</text></svg>

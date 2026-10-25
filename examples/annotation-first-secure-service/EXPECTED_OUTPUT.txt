@@ -1,0 +1,3 @@
+phase6.11 annotation demo security metadata: role=billing-approver permission=approve
+phase6.11 annotation demo authorized result: APPROVED
+phase6.11 annotation demo denied result: PERMISSION_DENIED

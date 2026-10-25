@@ -1,0 +1,323 @@
+// Copyright (c) 2026, Leo Galambos and the Egothor team
+// https://www.egothor.org
+// SPDX-License-Identifier: BSD-4-Clause
+// Licensed under the BSD 4-Clause License; see LICENSE for the full terms.
+// This product includes software developed by Leo Galambos and the Egothor
+// team (https://www.egothor.org).
+
+/*
+ * Purpose: aggregates strict Javadoc and public API documentation quality gates.
+ * Owns: aggregateJavadoc, validateJavadocs, and validatePublicApiDocs.
+ * Must not own: module dependencies, demo task bodies, example smoke flows, or release reports.
+ * Root rationale: these checks span multiple modules and enforce repository-wide
+ * documentation policy while leaving module builds declarative.
+ * Related validation tasks: validateJavadocs, validatePublicApiDocs.
+ */
+
+tasks.register("aggregateJavadoc") {
+    group = "documentation"
+    description = "Builds Javadocs for every Java module under strict doclint."
+    dependsOn subprojects.collect { Project candidate -> candidate.tasks.matching { Task task -> task.name == "javadoc" } }
+}
+
+ext.pmdProductionModuleNames = [
+        "j7m-api",
+        "j7m-annotation-processor",
+        "j7m-kernel",
+        "j7m-runtime",
+        "j7m-durable-log",
+        "j7m-messaging",
+        "j7m-coordination",
+        "j7m-consensus",
+        "j7m-distributed-core",
+        "j7m-integrations",
+        "j7m-cluster-management",
+        "j7m-saga",
+        "j7m-isolation",
+        "j7m-adapter-spi",
+        "j7m-transport-grpc",
+        "j7m-transport-rmi",
+        "j7m-application-platform",
+        "j7m-application-distributed",
+        "j7m-deployer-cli",
+        "j7m-gradle-plugin"
+]
+
+tasks.register("validatePmd") {
+    group = "verification"
+    description = "Runs PMD 7.26.0 over every handwritten production Java module."
+    dependsOn pmdProductionModuleNames.collect { String moduleName ->
+        project(":${moduleName}").tasks.named("pmdMain")
+    }
+    doLast {
+        println "Validated PMD production modules: ${pmdProductionModuleNames.join(', ')}"
+    }
+}
+
+tasks.named("check") {
+    dependsOn "validatePmd"
+}
+
+tasks.register("validateJavadocs") {
+    group = "verification"
+    description = "Validates strict Javadoc configuration and rejects documentation suppressions."
+    dependsOn "aggregateJavadoc"
+    doLast {
+        List<File> inputs = [file("settings.gradle"), file("build.gradle"), file("build.gradle.kts"),
+                             file("gradle/libs.versions.toml")]
+                .findAll { File candidate -> candidate.exists() }
+        if (file("buildSrc").exists()) {
+            inputs.addAll(fileTree("buildSrc").matching {
+                include "**/*.gradle"
+                include "**/*.gradle.kts"
+                include "**/*.java"
+                include "**/*.groovy"
+                include "**/*.toml"
+            }.files)
+        }
+        List<String> forbidden = [
+                ["Xdoclint", "none"].join(":"),
+                ["-Xdoclint", "none"].join(":"),
+                ["doclint", "disabled"].join(" "),
+                ["failOnError", "false"].join(" = "),
+                ["isFailOnError", "false"].join(" = "),
+                ["Xdoclint:all", "missing"].join(",-")
+        ]
+        List<String> matches = []
+        inputs.each { File input ->
+            String text = input.getText("UTF-8")
+            forbidden.each { String token ->
+                if (text.contains(token)) {
+                    matches.add("${input}:${token}")
+                }
+            }
+        }
+        if (!matches.isEmpty()) {
+            throw new GradleException("forbidden Javadoc suppression detected: ${matches}")
+        }
+    }
+}
+
+tasks.register("validatePublicApiDocs") {
+    group = "verification"
+    description = "Validates public API Javadocs for missing record tags and placeholder text."
+    dependsOn "validateJavadocs"
+    doLast {
+        List<File> sourceRoots = subprojects.collect { Project candidate -> file("${candidate.name}/src/main/java") }
+                .findAll { File candidate -> candidate.isDirectory() }
+        List<String> placeholderMatches = []
+        List<String> missingRecordComponentTags = []
+	        List<String> placeholderTokens = [
+	                "TODO",
+	                "TBD",
+	                "Documentation pending",
+	                "Auto-generated",
+	                "Not implemented",
+	                "No-op",
+	                "see README",
+	                "see README for details",
+	                "simple placeholder",
+	                "not documented",
+	                "implementation detail",
+	                "temporary",
+	                "fix later"
+	        ]
+	        Closure<Boolean> publicApiSource = { File source ->
+	            String path = source.path.replace(File.separatorChar, '/' as char)
+	            return path.contains("/j7m-api/src/main/java/")
+	                    || path.contains("/j7m-application-platform/src/main/java/org/j7m/middleware/application/api/")
+	                    || path.contains("/j7m-adapter-spi/src/main/java/org/j7m/middleware/adapter/spi/")
+	                    || path.contains("/j7m-adapter-tck/src/main/java/org/j7m/middleware/adapter/tck/")
+	        }
+	        sourceRoots.each { File sourceRoot ->
+	            fileTree(sourceRoot).matching { include "**/*.java"; exclude "**/internal/**" }.files.each { File source ->
+	                String text = source.getText("UTF-8")
+	                if (publicApiSource(source)) {
+	                    placeholderTokens.each { String marker ->
+	                        if (text.contains(marker)) {
+	                            placeholderMatches.add("${source}:${marker}")
+	                        }
+	                    }
+	                }
+                java.util.regex.Matcher matcher = java.util.regex.Pattern
+                        .compile("(?s)/\\*\\*(.*?)\\*/\\s*public\\s+record\\s+([A-Za-z0-9_]+)\\s*\\((.*?)\\)")
+                        .matcher(text)
+                while (matcher.find()) {
+                    String javadoc = matcher.group(1)
+                    String componentText = matcher.group(3)
+                    List<String> components = []
+                    StringBuilder current = new StringBuilder()
+                    int genericDepth = 0
+                    for (int index = 0; index < componentText.length(); index++) {
+                        char character = componentText.charAt(index)
+                        if (character == '<') {
+                            genericDepth++
+                        } else if (character == '>') {
+                            genericDepth--
+                        }
+                        if (character == ',' as char && genericDepth == 0) {
+                            components.add(current.toString())
+                            current.setLength(0)
+                        } else {
+                            current.append(character)
+                        }
+                    }
+                    if (current.length() > 0) {
+                        components.add(current.toString())
+                    }
+                    components.each { String rawComponent ->
+                        String component = rawComponent.trim()
+                        if (!component.isEmpty()) {
+                            String[] tokens = component.split("\\s+")
+                            String componentName = tokens[tokens.length - 1].replace("...", "").trim()
+                            if (componentName.contains("[")) {
+                                componentName = componentName.substring(0, componentName.indexOf("["))
+                            }
+                            if (!javadoc.contains("@param ${componentName}")) {
+                                missingRecordComponentTags.add("${source}:${matcher.group(2)}.${componentName}")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if (!placeholderMatches.isEmpty()) {
+            throw new GradleException("placeholder public API documentation/source detected: ${placeholderMatches.unique()}")
+        }
+	        if (!missingRecordComponentTags.isEmpty()) {
+	            throw new GradleException("public record components missing @param documentation: ${missingRecordComponentTags.unique()}")
+	        }
+	        Map<String, List<List<String>>> representativeDocs = [
+	                "j7m-api/src/main/java/org/j7m/middleware/api/consensus/ConsensusService.java": [
+	                        ["thread-safe", "thread safety", "concurrent"],
+	                        ["lifecycle", "close"],
+	                        ["error code", "error codes", "failure"],
+	                        ["redacted", "redaction", "sensitive"],
+	                        ["block", "blocking", "deadline", "timeout"]
+	                ],
+	                "j7m-api/src/main/java/org/j7m/middleware/api/coordination/CoordinationService.java": [
+	                        ["thread-safe", "thread safety", "concurrent"],
+	                        ["lifecycle", "close"],
+	                        ["error code", "error codes", "failure"],
+	                        ["redacted", "redaction", "sensitive"],
+	                        ["block", "blocking", "deadline", "timeout"]
+	                ],
+	                "j7m-api/src/main/java/org/j7m/middleware/api/messaging/DurableQueue.java": [
+	                        ["thread-safe", "thread safety", "concurrent"],
+	                        ["lifecycle", "close"],
+	                        ["error code", "error codes", "failure"],
+	                        ["redacted", "redaction", "sensitive"],
+	                        ["block", "blocking", "deadline", "timeout"]
+	                ],
+	                "j7m-api/src/main/java/org/j7m/middleware/api/durablelog/DurableLog.java": [
+	                        ["thread-safe", "thread safety", "concurrent"],
+	                        ["lifecycle", "close"],
+	                        ["error code", "error codes", "failure"],
+	                        ["redacted", "redaction", "sensitive"],
+	                        ["block", "blocking", "deadline", "timeout"]
+	                ],
+	                "j7m-api/src/main/java/org/j7m/middleware/application/api/replication/RepositoryReplicationService.java": [
+	                        ["thread-safe", "thread safety", "concurrent"],
+	                        ["lifecycle", "close"],
+	                        ["error code", "error codes", "failure"],
+	                        ["redacted", "redaction", "sensitive"],
+	                        ["block", "blocking", "deadline", "timeout"]
+	                ],
+	                "j7m-api/src/main/java/org/j7m/middleware/api/saga/SagaService.java": [
+	                        ["thread-safe", "thread safety", "concurrent"],
+	                        ["lifecycle", "close"],
+	                        ["error code", "error codes", "failure"],
+	                        ["redacted", "redaction", "sensitive"],
+	                        ["block", "blocking", "deadline", "timeout"]
+	                ],
+	                "j7m-api/src/main/java/org/j7m/middleware/api/isolation/IsolationProvider.java": [
+	                        ["thread-safe", "thread safety", "concurrent"],
+	                        ["lifecycle", "close"],
+	                        ["error code", "error codes", "failure"],
+	                        ["redacted", "redaction", "sensitive"],
+	                        ["block", "blocking", "deadline", "timeout"]
+	                ],
+	                "j7m-adapter-spi/src/main/java/org/j7m/middleware/adapter/spi/AdapterProvider.java": [
+	                        ["thread-safe", "thread safety", "concurrent"],
+	                        ["lifecycle", "close"],
+	                        ["error code", "error codes", "failure"],
+	                        ["redacted", "redaction", "sensitive"],
+	                        ["block", "blocking", "deadline", "timeout"]
+	                ],
+	                "j7m-api/src/main/java/org/j7m/middleware/api/MiddlewareRuntime.java": [
+	                        ["thread-safe", "thread safety", "concurrent"],
+	                        ["lifecycle", "close"],
+	                        ["error code", "error codes", "failure"],
+	                        ["security", "authorization", "principal"],
+	                        ["block", "blocking", "deadline", "timeout"]
+	                ],
+	                "j7m-api/src/main/java/org/j7m/middleware/api/ObjectRef.java": [
+	                        ["thread-safe", "thread safety", "immutable"],
+	                        ["security", "authorization", "bearer"],
+	                        ["redacted", "redaction", "sensitive"],
+	                        ["jpms", "module"],
+	                        ["compatibility", "upgrade"]
+	                ],
+	                "j7m-api/src/main/java/org/j7m/middleware/application/api/InvocationContext.java": [
+	                        ["thread-safe", "thread safety", "immutable"],
+	                        ["lifecycle", "scoped"],
+	                        ["security", "principal", "authorization"],
+	                        ["redacted", "redaction", "sensitive"],
+	                        ["virtual thread", "threadlocal", "cleanup"]
+	                ],
+	                "j7m-api/src/main/java/org/j7m/middleware/application/api/ApplicationContext.java": [
+	                        ["thread-safe", "thread safety", "concurrent"],
+	                        ["lifecycle", "activation"],
+	                        ["security", "principal", "authorization"],
+	                        ["redacted", "redaction", "sensitive"],
+	                        ["jpms", "module"]
+	                ],
+	                "j7m-adapter-tck/src/main/java/org/j7m/middleware/adapter/tck/AdapterTckRunner.java": [
+	                        ["thread-safe", "thread safety", "concurrent"],
+	                        ["lifecycle", "runner"],
+	                        ["error code", "failure", "rejected"],
+	                        ["redacted", "redaction", "sensitive"],
+	                        ["block", "blocking", "external services"]
+	                ],
+	                "j7m-api/src/main/java/org/j7m/middleware/application/api/J7mInjector.java": [
+	                        ["thread-safe", "thread safety", "concurrent"],
+	                        ["lifecycle", "lifecycle hooks"],
+	                        ["error code", "error codes", "failure"],
+	                        ["redacted", "redaction", "sensitive"],
+	                        ["block", "blocking", "network"]
+	                ],
+	                "j7m-api/src/main/java/org/j7m/middleware/annotations/J7mApplication.java": [
+	                        ["lifecycle", "activation"],
+	                        ["security", "policy"],
+	                        ["jpms", "module"],
+	                        ["transport", "vendor"],
+	                        ["injection", "capabilities"]
+	                ],
+	                "j7m-api/src/main/java/org/j7m/middleware/annotations/Inject.java": [
+	                        ["constructor", "field"],
+	                        ["jpms", "module"],
+	                        ["error code", "failure"],
+	                        ["diagnostics", "safe"],
+	                        ["dependency", "dependencies"]
+	                ]
+	        ]
+	        List<String> shallowServiceDocs = []
+	        representativeDocs.each { String path, List<List<String>> groups ->
+	            File source = file(path)
+	            if (!source.isFile()) {
+	                shallowServiceDocs.add("${path}:missing representative public API source")
+	            } else {
+	                String lowerText = source.getText("UTF-8").toLowerCase(java.util.Locale.ROOT)
+	                groups.each { List<String> alternatives ->
+	                    boolean matched = alternatives.any { String token -> lowerText.contains(token.toLowerCase(java.util.Locale.ROOT)) }
+	                    if (!matched) {
+	                        shallowServiceDocs.add("${path}:missing semantic documentation term from ${alternatives}")
+	                    }
+	                }
+	            }
+	        }
+	        if (!shallowServiceDocs.isEmpty()) {
+	            throw new GradleException("representative public API documentation is too shallow: ${shallowServiceDocs.unique()}")
+	        }
+	    }
+	}

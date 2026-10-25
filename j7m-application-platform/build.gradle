@@ -1,0 +1,22 @@
+// Copyright (c) 2026, Leo Galambos and the Egothor team
+// https://www.egothor.org
+// SPDX-License-Identifier: BSD-4-Clause
+// Licensed under the BSD 4-Clause License; see LICENSE for the full terms.
+// This product includes software developed by Leo Galambos and the Egothor
+// team (https://www.egothor.org).
+
+dependencies {
+    api project(":j7m-api")
+    api project(":j7m-runtime")
+    implementation project(":j7m-kernel")
+    implementation project(":j7m-durable-log")
+    testImplementation project(":j7m-durable-log")
+    testImplementation project(":j7m-annotation-processor")
+    testImplementation project(":j7m-transport-grpc")
+    testImplementation libs.junit.jupiter
+    testRuntimeOnly libs.junit.platform.launcher
+}
+
+tasks.named('test') {
+    systemProperty 'j7m.artifact.test.classpath', sourceSets.test.runtimeClasspath.asPath
+}

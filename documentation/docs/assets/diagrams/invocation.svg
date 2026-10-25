@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="420" viewBox="0 0 960 420" role="img" aria-labelledby="title desc">
+<title id="title">Logical outcome and physical ownership</title><desc id="desc">A call traverses transport and admission before business code. Caller-visible timeout does not prove physical work has ended.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 10 5 0 10Z" fill="#2587b6"/></marker></defs>
+<rect x="1" y="1" width="958" height="418" rx="16" fill="#f3f8fc" stroke="#d9e6ee"/>
+<text x="30" y="37" fill="#071a2c" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="700">Logical outcome and physical ownership</text>
+<path d="M220 140H265" fill="none" stroke="#2587b6" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M455 140H500" fill="none" stroke="#2587b6" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M690 140H735" fill="none" stroke="#2587b6" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M360 190V305H290" fill="none" stroke="#2587b6" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="330" y="290" text-anchor="middle" fill="#235775" font-family="Segoe UI,Arial,sans-serif" font-size="13">reply</text>
+<path d="M830 190V260" fill="none" stroke="#2587b6" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M500 305H290" fill="none" stroke="#2587b6" stroke-width="2" stroke-dasharray="6 5"/>
+<text x="395" y="290" text-anchor="middle" fill="#235775" font-family="Segoe UI,Arial,sans-serif" font-size="13">may finish later</text>
+<rect x="30" y="90" width="190" height="100" rx="10" fill="white" stroke="#9fbdcf" stroke-width="1.4"/><rect x="30" y="90" width="190" height="7" rx="3" fill="#efc45c"/><text x="46" y="122" fill="#0b263e" font-family="Segoe UI,Arial,sans-serif" font-size="16" font-weight="700">Caller</text>
+<text x="46" y="147" fill="#3e5d73" font-family="Segoe UI,Arial,sans-serif" font-size="14">Invoke a reference</text>
+<text x="46" y="168" fill="#3e5d73" font-family="Segoe UI,Arial,sans-serif" font-size="14">Bounded deadline</text>
+<rect x="265" y="90" width="190" height="100" rx="10" fill="white" stroke="#9fbdcf" stroke-width="1.4"/><rect x="265" y="90" width="190" height="7" rx="3" fill="#efc45c"/><text x="281" y="122" fill="#0b263e" font-family="Segoe UI,Arial,sans-serif" font-size="16" font-weight="700">Transport</text>
+<text x="281" y="147" fill="#3e5d73" font-family="Segoe UI,Arial,sans-serif" font-size="14">gRPC or RMI</text>
+<text x="281" y="168" fill="#3e5d73" font-family="Segoe UI,Arial,sans-serif" font-size="14">Encoded call frame</text>
+<rect x="500" y="90" width="190" height="100" rx="10" fill="white" stroke="#9fbdcf" stroke-width="1.4"/><rect x="500" y="90" width="190" height="7" rx="3" fill="#efc45c"/><text x="516" y="122" fill="#0b263e" font-family="Segoe UI,Arial,sans-serif" font-size="16" font-weight="700">Runtime boundary</text>
+<text x="516" y="147" fill="#3e5d73" font-family="Segoe UI,Arial,sans-serif" font-size="14">Security and admission</text>
+<text x="516" y="168" fill="#3e5d73" font-family="Segoe UI,Arial,sans-serif" font-size="14">Owned CALL context</text>
+<rect x="735" y="90" width="195" height="100" rx="10" fill="white" stroke="#9fbdcf" stroke-width="1.4"/><rect x="735" y="90" width="195" height="7" rx="3" fill="#efc45c"/><text x="751" y="122" fill="#0b263e" font-family="Segoe UI,Arial,sans-serif" font-size="16" font-weight="700">Application code</text>
+<text x="751" y="147" fill="#3e5d73" font-family="Segoe UI,Arial,sans-serif" font-size="14">Managed callback</text>
+<text x="751" y="168" fill="#3e5d73" font-family="Segoe UI,Arial,sans-serif" font-size="14">Tracked child work</text>
+<rect x="30" y="260" width="260" height="90" rx="10" fill="white" stroke="#9fbdcf" stroke-width="1.4"/><rect x="30" y="260" width="260" height="7" rx="3" fill="#efc45c"/><text x="46" y="292" fill="#0b263e" font-family="Segoe UI,Arial,sans-serif" font-size="16" font-weight="700">Logical outcome</text>
+<text x="46" y="317" fill="#3e5d73" font-family="Segoe UI,Arial,sans-serif" font-size="14">Result, error or cancellation</text>
+<rect x="500" y="260" width="430" height="90" rx="10" fill="white" stroke="#9fbdcf" stroke-width="1.4"/><rect x="500" y="260" width="430" height="7" rx="3" fill="#efc45c"/><text x="516" y="292" fill="#0b263e" font-family="Segoe UI,Arial,sans-serif" font-size="16" font-weight="700">Physical completion</text>
+<text x="516" y="317" fill="#3e5d73" font-family="Segoe UI,Arial,sans-serif" font-size="14">Drain retains ownership until tracked work exits</text>
+<text x="30" y="395" fill="#466174" font-family="Segoe UI,Arial,sans-serif" font-size="13">Do not interpret timeout or cancellation as permission to replay an unknown business effect.</text></svg>

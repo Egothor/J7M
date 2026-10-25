@@ -1,0 +1,4 @@
+annotation-first observability workload: workload=task-7 metadata-only
+annotation-first observability routing: routing=tenant-7 ordered
+annotation-first observability recovery: checkpoint=42 restore=42 progress=<redacted>
+annotation-first observability benchmark: benchmark=public-probe

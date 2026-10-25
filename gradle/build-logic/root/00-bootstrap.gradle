@@ -1,0 +1,63 @@
+// Copyright (c) 2026, Leo Galambos and the Egothor team
+// https://www.egothor.org
+// SPDX-License-Identifier: BSD-4-Clause
+// Licensed under the BSD 4-Clause License; see LICENSE for the full terms.
+// This product includes software developed by Leo Galambos and the Egothor
+// team (https://www.egothor.org).
+
+/*
+ * Purpose: establishes root project identity, shared subproject conventions,
+ * and JPMS module inventories used by architecture and acceptance validators.
+ * Owns: group/version, common convention plugin application, and stable module maps.
+ * Must not own: module dependency graphs, demo JavaExec bodies, example packaging flows,
+ * or generated acceptance-report content.
+ * Root rationale: these values describe the whole repository and are consumed by
+ * several root orchestration validators rather than by one module.
+ * Related validation tasks: validateJ7mArchitecture, validateModuleTopology,
+ * validateSovereignReliability.
+ */
+
+allprojects {
+    group = "org.j7m"
+    version = "0.1.0-SNAPSHOT"
+}
+
+subprojects {
+    apply plugin: "j7m.java-conventions"
+    apply plugin: "j7m.javadoc-conventions"
+}
+
+ext.jpmsProductionModules = [
+        "j7m-api": "org.j7m.api",
+        "j7m-annotation-processor": "org.j7m.annotation.processor",
+        "j7m-kernel": "org.j7m.kernel",
+        "j7m-runtime": "org.j7m.runtime",
+        "j7m-durable-log": "org.j7m.durablelog",
+        "j7m-messaging": "org.j7m.messaging",
+        "j7m-coordination": "org.j7m.coordination",
+        "j7m-consensus": "org.j7m.consensus",
+        "j7m-distributed-core": "org.j7m.distributed.core",
+        "j7m-integrations": "org.j7m.integrations",
+        "j7m-cluster-management": "org.j7m.cluster.management",
+        "j7m-saga": "org.j7m.saga",
+        "j7m-isolation": "org.j7m.isolation",
+        "j7m-adapter-spi": "org.j7m.adapter.spi",
+        "j7m-transport-grpc": "org.j7m.transport.grpc",
+        "j7m-transport-rmi": "org.j7m.transport.rmi",
+        "j7m-application-platform": "org.j7m.application.platform",
+        "j7m-application-distributed": "org.j7m.application.distributed"
+]
+
+ext.jpmsSupportModules = [
+        "j7m-deployer-cli": "org.j7m.deployer.cli",
+        "j7m-adapter-tck": "org.j7m.adapter.tck",
+        "j7m-testkit": "org.j7m.testkit",
+        "j7m-examples": "org.j7m.examples"
+]
+
+ext.jpmsNotApplicableModules = [
+        "j7m-demo": "DEMO_MODULE",
+        "j7m-tests": "TEST_ONLY_MODULE",
+        "j7m-gradle-plugin": "GRADLE_PLUGIN_MODULE: Gradle TestKit/plugin publishing uses Gradle API jars on the plugin classpath, not a stable JPMS module path in this build."
+]
+

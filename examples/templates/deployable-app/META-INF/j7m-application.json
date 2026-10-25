@@ -1,0 +1,45 @@
+{
+  "schemaVersion": "j7m.application/v1",
+  "application": {
+    "group": "com.example",
+    "name": "deployable-app",
+    "version": "1.0.0",
+    "displayName": "Deployable App",
+    "description": "JPMS deployable application template"
+  },
+  "runtime": {
+    "minJ7mVersion": "0.5.5",
+    "javaVersion": "25",
+    "moduleMode": "JPMS",
+    "bootstrapClass": "com.example.deployable.DeployableApplication",
+    "bootstrapModule": "com.example.deployable"
+  },
+  "modules": [
+    {
+      "name": "com.example.deployable",
+      "path": "modules/com.example.deployable.jar"
+    }
+  ],
+  "services": [
+    {
+      "serviceName": "//apps/example/deployable/DeployableService",
+      "interfaceName": "com.example.deployable.DeployableService",
+      "implementationClass": "com.example.deployable.DeployableServiceImpl",
+      "transport": "grpc",
+      "globallyExported": true,
+      "metadata": {
+        "template": "deployable-app"
+      }
+    }
+  ],
+  "security": {
+    "trustDomain": "dev",
+    "confidential": false
+  },
+  "resources": {
+    "cpu": "1",
+    "memory": "256MiB",
+    "maxConcurrentInvocations": 16,
+    "maxInboundPayload": "1MiB"
+  }
+}

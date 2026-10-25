@@ -1,0 +1,32 @@
+// Copyright (c) 2026, Leo Galambos and the Egothor team
+// https://www.egothor.org
+// SPDX-License-Identifier: BSD-4-Clause
+// Licensed under the BSD 4-Clause License; see LICENSE for the full terms.
+// This product includes software developed by Leo Galambos and the Egothor
+// team (https://www.egothor.org).
+
+plugins {
+    id "application"
+}
+
+application {
+    mainClass = "org.j7m.middleware.deployer.cli.J7mCli"
+}
+
+dependencies {
+    implementation project(":j7m-api")
+    implementation project(":j7m-application-platform")
+    testImplementation libs.junit.jupiter
+    testRuntimeOnly libs.junit.platform.launcher
+}
+
+tasks.register("validateJ7mCliConsole", Test) {
+    group = "verification"
+    description = "Runs the focused Phase 7.4-7.5 nugget CLI console and inspection validation tests."
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    outputs.upToDateWhen { false }
+    filter {
+        includeTestsMatching "org.j7m.middleware.deployer.cli.J7mCliTest"
+    }
+}

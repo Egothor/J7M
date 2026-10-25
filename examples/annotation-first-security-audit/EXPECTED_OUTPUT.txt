@@ -1,0 +1,7 @@
+annotation-first security allowed: alice:sec-1:approved:invoice-7
+annotation-first security role denial: PERMISSION_DENIED
+annotation-first security permission denial: PERMISSION_DENIED
+annotation-first security trust denial: PERMISSION_DENIED
+annotation-first security redacted sensitive value: amount=<redacted>
+annotation-first security audit output: audit principal=alice action=approve resource=invoice-7 amount=<redacted>
+annotation-first security confidential boundary: configured transport/security policy

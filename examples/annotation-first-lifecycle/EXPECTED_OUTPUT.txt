@@ -1,0 +1,2 @@
+annotation-first lifecycle events: [initialize, startup, drain, shutdown]
+annotation-first lifecycle readiness: true

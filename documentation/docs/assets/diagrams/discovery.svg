@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="420" viewBox="0 0 960 420" role="img" aria-labelledby="title desc">
+<title id="title">Choose a discovery implementation</title><desc id="desc">Embedded, multicast and network bootstrap are alternative configured registries, with context and trust filtering.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 10 5 0 10Z" fill="#2587b6"/></marker></defs>
+<rect x="1" y="1" width="958" height="418" rx="16" fill="#f3f8fc" stroke="#d9e6ee"/>
+<text x="30" y="37" fill="#071a2c" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="700">Choose a discovery implementation</text>
+<path d="M405 135V160H165V190" fill="none" stroke="#2587b6" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M480 135V190" fill="none" stroke="#2587b6" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M555 135V160H795V190" fill="none" stroke="#2587b6" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="345" y="60" width="270" height="75" rx="10" fill="white" stroke="#9fbdcf" stroke-width="1.4"/><rect x="345" y="60" width="270" height="7" rx="3" fill="#efc45c"/><text x="361" y="92" fill="#0b263e" font-family="Segoe UI,Arial,sans-serif" font-size="16" font-weight="700">Registry query</text>
+<text x="361" y="117" fill="#3e5d73" font-family="Segoe UI,Arial,sans-serif" font-size="14">Select the configured registry</text>
+<rect x="30" y="190" width="270" height="85" rx="10" fill="white" stroke="#9fbdcf" stroke-width="1.4"/><rect x="30" y="190" width="270" height="7" rx="3" fill="#efc45c"/><text x="46" y="222" fill="#0b263e" font-family="Segoe UI,Arial,sans-serif" font-size="16" font-weight="700">Embedded</text>
+<text x="46" y="247" fill="#3e5d73" font-family="Segoe UI,Arial,sans-serif" font-size="14">Local records only</text>
+<rect x="345" y="190" width="270" height="85" rx="10" fill="white" stroke="#9fbdcf" stroke-width="1.4"/><rect x="345" y="190" width="270" height="7" rx="3" fill="#efc45c"/><text x="361" y="222" fill="#0b263e" font-family="Segoe UI,Arial,sans-serif" font-size="16" font-weight="700">UDP multicast</text>
+<text x="361" y="247" fill="#3e5d73" font-family="Segoe UI,Arial,sans-serif" font-size="14">Questions and remote replies</text>
+<rect x="660" y="190" width="270" height="85" rx="10" fill="white" stroke="#9fbdcf" stroke-width="1.4"/><rect x="660" y="190" width="270" height="7" rx="3" fill="#efc45c"/><text x="676" y="222" fill="#0b263e" font-family="Segoe UI,Arial,sans-serif" font-size="16" font-weight="700">TLS unicast bootstrap</text>
+<text x="676" y="247" fill="#3e5d73" font-family="Segoe UI,Arial,sans-serif" font-size="14">Known seeds and peer traversal</text>
+<text x="30" y="395" fill="#466174" font-family="Segoe UI,Arial,sans-serif" font-size="13">Match context, interfaces and metadata; verify record trust and lease validity before selection.</text></svg>

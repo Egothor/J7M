@@ -1,0 +1,374 @@
+// Copyright (c) 2026, Leo Galambos and the Egothor team
+// https://www.egothor.org
+// SPDX-License-Identifier: BSD-4-Clause
+// Licensed under the BSD 4-Clause License; see LICENSE for the full terms.
+// This product includes software developed by Leo Galambos and the Egothor
+// team (https://www.egothor.org).
+
+plugins {
+    id "j7m.demo-module"
+}
+
+application {
+    mainClass = "org.j7m.middleware.demo.Phase1Demo"
+}
+
+dependencies {
+    implementation project(":j7m-api")
+    implementation project(":j7m-kernel")
+    implementation project(":j7m-runtime")
+    implementation project(":j7m-application-platform")
+    implementation project(":j7m-durable-log")
+    implementation project(":j7m-messaging")
+    implementation project(":j7m-coordination")
+    implementation project(":j7m-consensus")
+    implementation project(":j7m-saga")
+    implementation project(":j7m-isolation")
+    implementation project(":j7m-adapter-spi")
+    implementation project(":j7m-adapter-tck")
+    implementation project(":j7m-deployer-cli")
+    implementation project(":j7m-examples")
+    implementation project(":j7m-transport-grpc")
+    implementation project(":j7m-transport-rmi")
+}
+
+tasks.register("runUdpMulticastDemo", JavaExec) {
+    group = "application"
+    description = "Runs the real UDP multicast discovery demo."
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = "org.j7m.middleware.demo.Phase1Demo"
+    args "udp"
+}
+
+tasks.register("runSecurityDemo", JavaExec) {
+    group = "application"
+    description = "Runs the Phase 3 security hardening demo."
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = "org.j7m.middleware.demo.Phase1Demo"
+    args "security"
+}
+
+tasks.register("runMtlsSecurityDemo", JavaExec) {
+    group = "application"
+    description = "Runs the Phase 3.1 mTLS security demo."
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = "org.j7m.middleware.demo.Phase1Demo"
+    args "mtls"
+}
+
+tasks.register("runWorkloadDemo", JavaExec) {
+    group = "application"
+    description = "Runs the Phase 4 workload baseline demo."
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = "org.j7m.middleware.demo.Phase1Demo"
+    args "workload"
+}
+
+tasks.register("runStreamingWorkloadDemo", JavaExec) {
+    group = "application"
+    description = "Runs the Phase 4.1 remote streaming workload demo."
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = "org.j7m.middleware.demo.Phase1Demo"
+    args "streaming-workload"
+}
+
+tasks.register("runComplianceDemo", JavaExec) {
+    group = "application"
+    description = "Runs the Phase 5 regulated enterprise readiness demo."
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = "org.j7m.middleware.demo.Phase1Demo"
+    args "compliance"
+}
+
+tasks.register("runEnterpriseReadinessDemo", JavaExec) {
+    group = "application"
+    description = "Runs the Phase 5.1 enterprise readiness handoff demo."
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = "org.j7m.middleware.demo.Phase1Demo"
+    args "enterprise-readiness"
+}
+
+tasks.register("runApplicationDeploymentDemo", JavaExec) {
+    group = "application"
+    description = "Runs the Phase 5.2 application deployment vertical-slice demo."
+    dependsOn ":j7m-examples:jar"
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = "org.j7m.middleware.demo.Phase1Demo"
+    args "application-deployment"
+}
+
+tasks.register("runModularApplicationDeploymentDemo", JavaExec) {
+    group = "application"
+    description = "Runs the Phase 5.2 JPMS ModuleLayer application deployment demo."
+    dependsOn ":examples:modular-hello-api:jar"
+    dependsOn ":examples:modular-hello-impl:jar"
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = "org.j7m.middleware.demo.Phase1Demo"
+    args "modular-application-deployment"
+}
+
+tasks.register("runApplicationUpgradeRollbackDemo", JavaExec) {
+    group = "application"
+    description = "Runs the Phase 5.4 stop-start upgrade and rollback demo."
+    dependsOn ":examples:modular-hello-api:jar"
+    dependsOn ":examples:modular-hello-impl:jar"
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = "org.j7m.middleware.demo.Phase1Demo"
+    args "application-upgrade-rollback"
+}
+
+tasks.register("runRollingUpgradeDemo", JavaExec) {
+    group = "application"
+    description = "Runs the Phase 5.4 rolling upgrade demo."
+    dependsOn ":examples:modular-hello-api:jar"
+    dependsOn ":examples:modular-hello-impl:jar"
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = "org.j7m.middleware.demo.Phase1Demo"
+    args "rolling-upgrade"
+}
+
+tasks.register("runBlueGreenUpgradeDemo", JavaExec) {
+    group = "application"
+    description = "Runs the Phase 5.4 blue-green upgrade demo."
+    dependsOn ":examples:modular-hello-api:jar"
+    dependsOn ":examples:modular-hello-impl:jar"
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = "org.j7m.middleware.demo.Phase1Demo"
+    args "blue-green-upgrade"
+}
+
+tasks.register("runCanaryBaselineUpgradeDemo", JavaExec) {
+    group = "application"
+    description = "Runs the Phase 5.4 canary-baseline upgrade demo."
+    dependsOn ":examples:modular-hello-api:jar"
+    dependsOn ":examples:modular-hello-impl:jar"
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = "org.j7m.middleware.demo.Phase1Demo"
+    args "canary-baseline-upgrade"
+}
+
+tasks.register("runApplicationFailureDiagnosticsDemo", JavaExec) {
+    group = "application"
+    description = "Runs the Phase 5.4 application failure diagnostics demo."
+    dependsOn ":examples:modular-hello-api:jar"
+    dependsOn ":examples:modular-hello-impl:jar"
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = "org.j7m.middleware.demo.Phase1Demo"
+    args "application-failure-diagnostics"
+}
+
+tasks.register("runApplicationAdminStatusDemo", JavaExec) {
+    group = "application"
+    description = "Runs the Phase 5.4 application admin/status completeness demo."
+    dependsOn ":examples:modular-hello-api:jar"
+    dependsOn ":examples:modular-hello-impl:jar"
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = "org.j7m.middleware.demo.Phase1Demo"
+    args "application-admin-status"
+}
+
+tasks.register("runHelloRemoteServiceExample", JavaExec) {
+    group = "application"
+    description = "Runs the Phase 5.5 hello remote service example."
+    dependsOn ":j7m-examples:jar"
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = "org.j7m.middleware.demo.Phase1Demo"
+    args "hello-remote-service-example"
+}
+
+tasks.register("runCallbacksAndEventsExample", JavaExec) {
+    group = "application"
+    description = "Runs the Phase 5.5 callbacks and events example over gRPC and RMI."
+    dependsOn ":j7m-examples:jar"
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = "org.j7m.middleware.demo.Phase1Demo"
+    args "callbacks-and-events-example"
+}
+
+tasks.register("runSecureBankingWorkflowExample", JavaExec) {
+    group = "application"
+    description = "Runs the Phase 5.5 secure banking workflow pattern example."
+    dependsOn ":j7m-examples:jar"
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = "org.j7m.middleware.demo.Phase1Demo"
+    args "secure-banking-workflow-example"
+}
+
+tasks.register("runHaHpClusterExample", JavaExec) {
+    group = "application"
+    description = "Runs the Phase 5.5 HA/HP cluster example."
+    dependsOn ":j7m-examples:jar"
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = "org.j7m.middleware.demo.Phase1Demo"
+    args "ha-hp-cluster-example"
+}
+
+tasks.register("runWorkloadProcessingExample", JavaExec) {
+    group = "application"
+    description = "Runs the Phase 5.5 workload-processing deployable example."
+    dependsOn ":j7m-examples:jar"
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = "org.j7m.middleware.demo.Phase1Demo"
+    args "workload-processing-example"
+}
+
+tasks.register("runStreamingPipelineExample", JavaExec) {
+    group = "application"
+    description = "Runs the Phase 5.5 streaming-pipeline deployable example."
+    dependsOn ":j7m-examples:jar"
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = "org.j7m.middleware.demo.Phase1Demo"
+    args "streaming-pipeline-example"
+}
+
+tasks.register("runRegulatedEnterpriseAppExample", JavaExec) {
+    group = "application"
+    description = "Runs the Phase 5.5 regulated-enterprise deployable example."
+    dependsOn ":j7m-examples:jar"
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = "org.j7m.middleware.demo.Phase1Demo"
+    args "regulated-enterprise-app-example"
+}
+
+tasks.register("runNuggetAdminDemo", JavaExec) {
+    group = "application"
+    description = "Runs the deterministic Phase 7.0-7.10 local in-process nugget admin demo."
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = "org.j7m.middleware.demo.operations.NuggetOperationsDemo"
+    args "admin"
+}
+
+tasks.register("runNuggetCliDemo", JavaExec) {
+    group = "application"
+    description = "Runs the deterministic Phase 7.0-7.10 production CLI prompt, target, status, and inspection demo."
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = "org.j7m.middleware.demo.operations.NuggetOperationsDemo"
+    args "cli"
+}
+
+tasks.register("runNuggetCliApplicationLifecycleDemo", JavaExec) {
+    group = "application"
+    description = "Runs the deterministic Phase 7.6 nugget CLI application lifecycle demo."
+    dependsOn ":j7m-examples:jar"
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = "org.j7m.middleware.demo.operations.NuggetOperationsDemo"
+    args "cli-application-lifecycle"
+}
+
+tasks.register("runNuggetCliKillDisabledDemo", JavaExec) {
+    group = "application"
+    description = "Runs the deterministic Phase 7.7 nugget CLI shutdown and kill-disabled demo."
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = "org.j7m.middleware.demo.operations.NuggetOperationsDemo"
+    args "cli-kill-disabled"
+}
+
+tasks.register("runNuggetCliPinFailureDemo", JavaExec) {
+    group = "application"
+    description = "Runs the deterministic Phase 7.0-7.10 nugget CLI PIN rejection demo."
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = "org.j7m.middleware.demo.operations.NuggetOperationsDemo"
+    args "pin-failure"
+}
+
+tasks.register("runGradlePluginWorkflowDemo") {
+    group = "application"
+    description = "Runs the Phase 5.5 Gradle plugin local workflow demo."
+    dependsOn rootProject.tasks.named("j7mPackage")
+    dependsOn rootProject.tasks.named("j7mSign")
+    dependsOn rootProject.tasks.named("j7mVerify")
+    dependsOn rootProject.tasks.named("j7mDeployLocal")
+    dependsOn rootProject.tasks.named("j7mPlanLocal")
+    dependsOn rootProject.tasks.named("j7mRunLocal")
+    dependsOn rootProject.tasks.named("j7mStatusLocal")
+    dependsOn rootProject.tasks.named("j7mStopLocal")
+    dependsOn rootProject.tasks.named("j7mUnloadLocal")
+    doLast {
+        println "phase5.5 gradle plugin workflow: package/sign/verify/deploy/plan/run/status/stop/unload PASS"
+    }
+}
+
+tasks.register("runDeployerCliWorkflowDemo") {
+    group = "application"
+    description = "Runs the Phase 5.5 deployer CLI local lifecycle workflow demo."
+    dependsOn ":j7m-deployer-cli:test"
+    doLast {
+        println "phase5.5 deployer cli workflow: package/sign/verify/deploy/plan/start/list/status/stop/unload PASS"
+    }
+}
+
+tasks.register("runDeployerCliUpgradeRollbackDemo") {
+    group = "application"
+    description = "Runs the Phase 5.5 deployer CLI upgrade and rollback workflow demo."
+    dependsOn ":j7m-deployer-cli:test"
+    dependsOn ":j7m-demo:runApplicationUpgradeRollbackDemo"
+    dependsOn ":j7m-demo:runRollingUpgradeDemo"
+    dependsOn ":j7m-demo:runBlueGreenUpgradeDemo"
+    dependsOn ":j7m-demo:runCanaryBaselineUpgradeDemo"
+    doLast {
+        println "phase5.5 deployer cli upgrade rollback workflow: stop-start/rolling/blue-green/canary-baseline PASS"
+    }
+}
+
+tasks.register("runDurableLogCrashRecoveryDemo", JavaExec) {
+    group = "application"
+    description = "Runs the Phase 6.2 durable log crash recovery demo."
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = "org.j7m.middleware.demo.durablelog.DurableLogCrashRecoveryDemo"
+}
+
+tasks.register("runDurableQueueDemo", JavaExec) {
+    group = "application"
+    description = "Runs the Phase 6.3 durable queue and outbox/inbox demo."
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = "org.j7m.middleware.demo.messaging.DurableQueueDemo"
+}
+
+tasks.register("runCoordinationDemo", JavaExec) {
+    group = "application"
+    description = "Runs the Phase 6.4 coordination and membership demo."
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = "org.j7m.middleware.demo.coordination.CoordinationDemo"
+}
+
+tasks.register("runConsensusSimulationDemo", JavaExec) {
+    group = "application"
+    description = "Runs the Phase 6.5 deterministic consensus simulation demo."
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = "org.j7m.middleware.demo.consensus.ConsensusSimulationDemo"
+}
+
+tasks.register("runRepositoryReplicationDemo", JavaExec) {
+    group = "application"
+    description = "Runs the Phase 6.6 repository replication demo."
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = "org.j7m.middleware.demo.repository.RepositoryReplicationDemo"
+}
+
+tasks.register("runSagaDemo", JavaExec) {
+    group = "application"
+    description = "Runs the Phase 6.7 saga orchestration demo."
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = "org.j7m.middleware.demo.saga.SagaDemo"
+}
+
+tasks.register("runIsolationDemo", JavaExec) {
+    group = "application"
+    description = "Runs the Phase 6.8 isolation provider demo."
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = "org.j7m.middleware.demo.isolation.IsolationDemo"
+}
+
+tasks.register("runAdapterTckDemo", JavaExec) {
+    group = "application"
+    description = "Runs the Phase 6.9 adapter SPI/TCK demonstration against local fake fixtures."
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = "org.j7m.middleware.demo.adapter.AdapterTckDemo"
+}
+
+tasks.register("runAnnotationModelDemo", JavaExec) {
+    group = "application"
+    description = "Runs the Phase 6.11 annotation-first injection and descriptor demonstration."
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = "org.j7m.middleware.demo.annotation.AnnotationModelDemo"
+}

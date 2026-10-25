@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="420" viewBox="0 0 960 420" role="img" aria-labelledby="title desc">
+<title id="title">Durable jobs and sagas persist explicit decisions</title><desc id="desc">Jobs recover from explicit checkpoint state; sagas retain step decisions and require reconciliation for uncertain effects.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 10 5 0 10Z" fill="#2587b6"/></marker></defs>
+<rect x="1" y="1" width="958" height="418" rx="16" fill="#f3f8fc" stroke="#d9e6ee"/>
+<text x="30" y="37" fill="#071a2c" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="700">Durable jobs and sagas persist explicit decisions</text>
+<path d="M225 140H265" fill="none" stroke="#2587b6" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M460 140H500" fill="none" stroke="#2587b6" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M225 295H265" fill="none" stroke="#2587b6" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M460 295H500" fill="none" stroke="#2587b6" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="30" y="85" width="195" height="110" rx="10" fill="white" stroke="#9fbdcf" stroke-width="1.4"/><rect x="30" y="85" width="195" height="7" rx="3" fill="#efc45c"/><text x="46" y="117" fill="#0b263e" font-family="Segoe UI,Arial,sans-serif" font-size="16" font-weight="700">Job claim</text>
+<text x="46" y="142" fill="#3e5d73" font-family="Segoe UI,Arial,sans-serif" font-size="14">Run ID and owner</text>
+<text x="46" y="163" fill="#3e5d73" font-family="Segoe UI,Arial,sans-serif" font-size="14">Current fence</text>
+<rect x="265" y="85" width="195" height="110" rx="10" fill="white" stroke="#9fbdcf" stroke-width="1.4"/><rect x="265" y="85" width="195" height="7" rx="3" fill="#efc45c"/><text x="281" y="117" fill="#0b263e" font-family="Segoe UI,Arial,sans-serif" font-size="16" font-weight="700">Execute / restore</text>
+<text x="281" y="142" fill="#3e5d73" font-family="Segoe UI,Arial,sans-serif" font-size="14">Explicit checkpoint</text>
+<text x="281" y="163" fill="#3e5d73" font-family="Segoe UI,Arial,sans-serif" font-size="14">Progress safe points</text>
+<rect x="500" y="85" width="195" height="110" rx="10" fill="white" stroke="#9fbdcf" stroke-width="1.4"/><rect x="500" y="85" width="195" height="7" rx="3" fill="#efc45c"/><text x="516" y="117" fill="#0b263e" font-family="Segoe UI,Arial,sans-serif" font-size="16" font-weight="700">Job result</text>
+<text x="516" y="142" fill="#3e5d73" font-family="Segoe UI,Arial,sans-serif" font-size="14">Durable terminal result</text>
+<text x="516" y="163" fill="#3e5d73" font-family="Segoe UI,Arial,sans-serif" font-size="14">No stack serialization</text>
+<rect x="30" y="250" width="195" height="95" rx="10" fill="white" stroke="#9fbdcf" stroke-width="1.4"/><rect x="30" y="250" width="195" height="7" rx="3" fill="#efc45c"/><text x="46" y="282" fill="#0b263e" font-family="Segoe UI,Arial,sans-serif" font-size="16" font-weight="700">Saga intent</text>
+<text x="46" y="307" fill="#3e5d73" font-family="Segoe UI,Arial,sans-serif" font-size="14">Durable step identity</text>
+<text x="46" y="328" fill="#3e5d73" font-family="Segoe UI,Arial,sans-serif" font-size="14">Qualified authority</text>
+<rect x="265" y="250" width="195" height="95" rx="10" fill="white" stroke="#9fbdcf" stroke-width="1.4"/><rect x="265" y="250" width="195" height="7" rx="3" fill="#efc45c"/><text x="281" y="282" fill="#0b263e" font-family="Segoe UI,Arial,sans-serif" font-size="16" font-weight="700">Step outcome</text>
+<text x="281" y="307" fill="#3e5d73" font-family="Segoe UI,Arial,sans-serif" font-size="14">Known result or UNKNOWN</text>
+<text x="281" y="328" fill="#3e5d73" font-family="Segoe UI,Arial,sans-serif" font-size="14">Persisted transition</text>
+<rect x="500" y="250" width="430" height="95" rx="10" fill="white" stroke="#9fbdcf" stroke-width="1.4"/><rect x="500" y="250" width="430" height="7" rx="3" fill="#efc45c"/><text x="516" y="282" fill="#0b263e" font-family="Segoe UI,Arial,sans-serif" font-size="16" font-weight="700">Workflow decision</text>
+<text x="516" y="307" fill="#3e5d73" font-family="Segoe UI,Arial,sans-serif" font-size="14">Next step, reverse compensation or reconciliation</text>
+<text x="30" y="395" fill="#466174" font-family="Segoe UI,Arial,sans-serif" font-size="13">Persistent state enables recovery; it does not make arbitrary external side effects exactly once.</text></svg>

@@ -1,0 +1,104 @@
+/*
+ * BSD 4-Clause License
+ *
+ * Copyright (c) 2026, Leo Galambos and the Egothor team
+ * Website of the Egothor team: https://www.egothor.org
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
+ * met:
+ *
+ * 1. Redistributions of source code must retain the above copyright
+ * notice, this list of conditions and the following disclaimer.
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright
+ * notice, this list of conditions and the following disclaimer in the
+ * documentation and/or other materials provided with the distribution.
+ *
+ * 3. All advertising materials mentioning features or use of this
+ * software must display the following acknowledgement:
+ *
+ * This product includes software developed by Leo Galambos and the Egothor
+ * team (https://www.egothor.org).
+ *
+ * 4. Neither the name of the copyright holder nor the names of its
+ * contributors may be used to endorse or promote products derived from
+ * this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+ * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+ * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+package org.j7m.middleware.api.messaging;
+
+import java.io.Serializable;
+import java.util.Arrays;
+
+/**
+ * Immutable durable queue message payload and public metadata.
+ *
+ * <p>The class is immutable, serializable, and thread-safe. Payload bytes are
+ * defensively copied on construction and access. Payload contents are durable
+ * queue data and must not be included in exception messages, status text,
+ * metrics, or recovery reports. The associated {@link MessageHeader} is safe
+ * metadata and is preserved by the Phase 6.3 durable queue and outbox recovery
+ * path.</p>
+ */
+public final class QueueMessage implements Serializable {
+    /**
+     * Immutable safe message metadata.
+     */
+    private final MessageHeader header;
+    /**
+     * Defensive copy of payload bytes.
+     */
+    private final byte[] payload;
+
+    /**
+     * Creates a queue message.
+     *
+     * @param header safe public metadata; {@link MessageHeader#empty()} when null
+     * @param payload payload bytes; an empty payload when null
+     */
+    public QueueMessage(final MessageHeader header, final byte[] payload) {
+        this.header = header == null ? MessageHeader.empty() : header;
+        this.payload = payload == null ? new byte[0] : Arrays.copyOf(payload, payload.length);
+    }
+
+    /**
+     * Returns immutable safe metadata.
+     *
+     * @return message header
+     */
+    public MessageHeader header() {
+        return this.header;
+    }
+
+    /**
+     * Returns a defensive payload copy.
+     *
+     * @return payload copy
+     */
+    public byte[] payload() {
+        return Arrays.copyOf(this.payload, this.payload.length);
+    }
+
+    /**
+     * Returns payload size in bytes.
+     *
+     * @return payload length
+     */
+    public int payloadLength() {
+        return this.payload.length;
+    }
+}

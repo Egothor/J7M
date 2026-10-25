@@ -1,0 +1,91 @@
+/*
+ * BSD 4-Clause License
+ *
+ * Copyright (c) 2026, Leo Galambos and the Egothor team
+ * Website of the Egothor team: https://www.egothor.org
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
+ * met:
+ *
+ * 1. Redistributions of source code must retain the above copyright
+ * notice, this list of conditions and the following disclaimer.
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright
+ * notice, this list of conditions and the following disclaimer in the
+ * documentation and/or other materials provided with the distribution.
+ *
+ * 3. All advertising materials mentioning features or use of this
+ * software must display the following acknowledgement:
+ *
+ * This product includes software developed by Leo Galambos and the Egothor
+ * team (https://www.egothor.org).
+ *
+ * 4. Neither the name of the copyright holder nor the names of its
+ * contributors may be used to endorse or promote products derived from
+ * this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+ * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+ * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+package org.j7m.examples.workload;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+/**
+ * In-memory workload example implementation with deterministic fencing.
+ */
+public final class WorkloadServiceImpl implements WorkloadService {
+    private final Map<String, WorkloadTask> tasks = new LinkedHashMap<>();
+    private long currentFencingToken = 10L;
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public WorkloadTask submit(final String taskId) {
+        WorkloadTask task = new WorkloadTask(taskId, "RUNNING", 10, "submitted");
+        this.tasks.put(taskId, task);
+        return task;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public WorkloadTask checkpoint(final String taskId, final String checkpoint) {
+        WorkloadTask task = new WorkloadTask(taskId, "RUNNING", 50, checkpoint);
+        this.tasks.put(taskId, task);
+        return task;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public boolean fencedUpdate(final String taskId, final long fencingToken) {
+        return this.tasks.containsKey(taskId) && fencingToken >= this.currentFencingToken;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public WorkloadTask cancel(final String taskId) {
+        WorkloadTask task = new WorkloadTask(taskId, "CANCELLED", 50, "cancelled");
+        this.tasks.put(taskId, task);
+        return task;
+    }
+}

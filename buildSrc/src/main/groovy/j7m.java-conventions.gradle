@@ -1,0 +1,51 @@
+// Copyright (c) 2026, Leo Galambos and the Egothor team
+// https://www.egothor.org
+// SPDX-License-Identifier: BSD-4-Clause
+// Licensed under the BSD 4-Clause License; see LICENSE for the full terms.
+// This product includes software developed by Leo Galambos and the Egothor
+// team (https://www.egothor.org).
+
+plugins {
+    id "java-library"
+    id "pmd"
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+    withJavadocJar()
+    withSourcesJar()
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = "UTF-8"
+    options.release = 25
+    options.compilerArgs.addAll(["-Xlint:unchecked", "-Xlint:deprecation"])
+}
+
+tasks.withType(Test).configureEach {
+    useJUnitPlatform()
+    jvmArgs "--enable-native-access=ALL-UNNAMED", "--sun-misc-unsafe-memory-access=allow"
+}
+
+tasks.withType(JavaExec).configureEach {
+    jvmArgs "--enable-native-access=ALL-UNNAMED", "--sun-misc-unsafe-memory-access=allow"
+}
+
+pmd {
+    toolVersion = "7.26.0"
+    ruleSets = []
+    ruleSetFiles = files(rootProject.file("config/pmd/j7m-pmd-ruleset.xml"))
+    consoleOutput = true
+}
+
+tasks.withType(Pmd).configureEach {
+    reports {
+        xml.required = true
+        html.required = true
+    }
+}
+
+ext.j7mConventionPurpose = "Shared Java 25 library convention for compilation, test execution, JavaExec flags, source jars, Javadoc jars, and PMD checks."
+ext.j7mConventionKind = "shared-configuration"

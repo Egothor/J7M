@@ -1,0 +1,6 @@
+{
+  "builder": "j7m-local-fixture",
+  "sourceRevision": "working-tree",
+  "buildType": "development-example",
+  "certificationClaim": false
+}

@@ -1,0 +1,2 @@
+annotation-first queue metadata: orders outbox=orders-outbox inbox=true
+annotation-first queue dead-letter metadata: dead-letter:event-7

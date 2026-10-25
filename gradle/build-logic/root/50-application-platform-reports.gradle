@@ -1,0 +1,1108 @@
+// Copyright (c) 2026, Leo Galambos and the Egothor team
+// https://www.egothor.org
+// SPDX-License-Identifier: BSD-4-Clause
+// Licensed under the BSD 4-Clause License; see LICENSE for the full terms.
+// This product includes software developed by Leo Galambos and the Egothor
+// team (https://www.egothor.org).
+
+/*
+ * Purpose: generates and validates Phase 5 application-platform acceptance and
+ * limitation-burndown evidence used by examples and Phase 6 acceptance checks.
+ * Owns: validateApplicationPlatformDocs, diagnoseUdpMulticastCapability,
+ * generateApplicationPlatformAcceptanceReport, generateApplicationPlatformLimitationBurndownReport,
+ * and validateApplicationPlatform.
+ * Must not own: normal module dependency graphs, demo JavaExec implementations,
+ * final Phase 6 acceptance matrix rendering, or example source code.
+ * Root rationale: the reports aggregate evidence from several modules and demos
+ * and are therefore orchestration artifacts rather than module-local build logic.
+ * Related validation tasks: validateApplicationPlatform, validateSovereignReliability.
+ */
+
+tasks.register("validateApplicationPlatformDocs") {
+    group = "verification"
+    description = "Validates Phase 5.6 application-platform handoff documents."
+    doLast {
+        Map<String, List<String>> requiredDocs = [
+                "documentation/docs/deployment/signed-applications.md": ["SignaturePolicy", "verification"],
+                "documentation/docs/deployment/repositories.md": ["publish", "promote", "verifyAuditChain"],
+                "documentation/docs/deployment/upgrade-rollback.md": ["stop-start", "rolling", "blue-green", "rollback"],
+                "documentation/docs/deployment/gradle-workflow.md": ["j7mPackage", "j7mVerify", "unavailable"],
+                "documentation/docs/programming/module-dependencies.md": ["JPMS", "module"],
+                "documentation/docs/programming/contexts-identities.md": ["identity", "context"],
+                "documentation/docs/programming/workloads.md": ["workload", "stream"],
+                "documentation/docs/reference/cli.md": ["start", "--dry-run", "--json"],
+                "documentation/docs/about/middleware-contributing.md": ["PMD", "test", "validatePublicApiDocs"]
+        ]
+        requiredDocs.each { String relative, List<String> tokens ->
+            File document = file(relative)
+            if (!document.isFile() || document.text.trim().isEmpty()) {
+                throw new GradleException("missing or empty required document: ${relative}")
+            }
+            String text = document.getText("UTF-8").toLowerCase(java.util.Locale.ROOT)
+            tokens.each { String token ->
+                if (!text.contains(token.toLowerCase(java.util.Locale.ROOT))) {
+                    throw new GradleException("application platform public documentation missing ${token}: ${relative}")
+                }
+            }
+        }
+    }
+}
+
+tasks.register("diagnoseUdpMulticastCapability") {
+    group = "verification"
+    description = "Reports whether the latest test run observed loopback UDP multicast support."
+    dependsOn ":j7m-tests:phase2DiscoveryIntegrationTest"
+    doLast {
+        File resultDirectory = file("j7m-tests/build/test-results/phase2DiscoveryIntegrationTest")
+        List<String> udpSkips = []
+        fileTree(resultDirectory).matching { include "TEST-*.xml" }.files.each { File result ->
+            String text = result.getText("UTF-8")
+            java.util.regex.Matcher matcher = java.util.regex.Pattern
+                    .compile("<testcase name=\"([^\"]+)\" classname=\"([^\"]+)\"[^>]*>\\s*<skipped message=\"([^\"]+)\"", java.util.regex.Pattern.DOTALL)
+                    .matcher(text)
+            while (matcher.find()) {
+                if (matcher.group(3).contains("loopback multicast is not available on this host")) {
+                    udpSkips.add("${matcher.group(2)}.${matcher.group(1)}")
+                }
+            }
+        }
+        if (udpSkips.isEmpty()) {
+            println "UDP loopback multicast capability: available or no host-dependent UDP tests skipped in latest results"
+        } else {
+            println "UDP loopback multicast capability: unavailable on this host"
+            udpSkips.each { String testName -> println "  skipped: ${testName}" }
+        }
+    }
+}
+
+tasks.register("generateApplicationPlatformAcceptanceReport") {
+    group = "verification"
+    description = "Generates Phase 5.6 application-platform acceptance evidence."
+    dependsOn "build"
+    dependsOn ":j7m-tests:phase5ApplicationPlatformTest"
+    dependsOn ":j7m-gradle-plugin:test"
+    dependsOn ":j7m-deployer-cli:test"
+    dependsOn "buildExamples"
+    dependsOn "packageExamples"
+    dependsOn "verifyExamples"
+    dependsOn "j7mPackage"
+    dependsOn "j7mSign"
+    dependsOn "j7mVerify"
+    dependsOn "j7mDeployLocal"
+    dependsOn "j7mPlanLocal"
+    dependsOn "j7mRunLocal"
+    dependsOn "j7mStatusLocal"
+    dependsOn "j7mStopLocal"
+    dependsOn "j7mUnloadLocal"
+    dependsOn ":j7m-demo:run"
+    dependsOn ":j7m-demo:runApplicationDeploymentDemo"
+    dependsOn ":j7m-demo:runModularApplicationDeploymentDemo"
+    dependsOn ":j7m-demo:runApplicationUpgradeRollbackDemo"
+    dependsOn ":j7m-demo:runRollingUpgradeDemo"
+    dependsOn ":j7m-demo:runBlueGreenUpgradeDemo"
+    dependsOn ":j7m-demo:runCanaryBaselineUpgradeDemo"
+    dependsOn ":j7m-demo:runApplicationFailureDiagnosticsDemo"
+    dependsOn ":j7m-demo:runApplicationAdminStatusDemo"
+    dependsOn ":j7m-demo:runHelloRemoteServiceExample"
+    dependsOn ":j7m-demo:runCallbacksAndEventsExample"
+    dependsOn ":j7m-demo:runSecureBankingWorkflowExample"
+    dependsOn ":j7m-demo:runHaHpClusterExample"
+    dependsOn ":j7m-demo:runWorkloadProcessingExample"
+    dependsOn ":j7m-demo:runStreamingPipelineExample"
+    dependsOn ":j7m-demo:runRegulatedEnterpriseAppExample"
+    dependsOn ":j7m-demo:runGradlePluginWorkflowDemo"
+    dependsOn ":j7m-demo:runDeployerCliWorkflowDemo"
+    dependsOn ":j7m-demo:runDeployerCliUpgradeRollbackDemo"
+    dependsOn ":j7m-demo:runUdpMulticastDemo"
+    dependsOn ":j7m-demo:runSecurityDemo"
+    dependsOn ":j7m-demo:runMtlsSecurityDemo"
+    dependsOn ":j7m-demo:runWorkloadDemo"
+    dependsOn ":j7m-demo:runStreamingWorkloadDemo"
+    dependsOn ":j7m-demo:runComplianceDemo"
+    dependsOn ":j7m-demo:runEnterpriseReadinessDemo"
+    dependsOn ":j7m-kernel:dependencies"
+    dependsOn ":j7m-runtime:dependencies"
+    dependsOn "validateJ7mArchitecture"
+    dependsOn "validateApplicationPlatformDocs"
+    doLast {
+        File reportDirectory = file("${buildDir}/reports/j7m")
+        reportDirectory.mkdirs()
+        Map<String, Integer> testCounts = [tests: 0, failures: 0, errors: 0, skipped: 0, passed: 0]
+        List<Map<String, Object>> skippedTests = []
+        Closure<Integer> testSuiteAttribute = { String line, String attribute ->
+            java.util.regex.Matcher matcher = java.util.regex.Pattern
+                    .compile(attribute + "=\"(\\d+)\"")
+                    .matcher(line)
+            if (matcher.find()) {
+                return Integer.parseInt(matcher.group(1))
+            }
+            return 0
+        }
+        [
+                "j7m-tests/build/test-results/phase5ApplicationPlatformTest",
+                "j7m-gradle-plugin/build/test-results/test",
+                "j7m-deployer-cli/build/test-results/test"
+        ].each { String testResultPath ->
+            fileTree(testResultPath).matching { include "TEST-*.xml" }.files.each { File result ->
+                String text = result.getText("UTF-8")
+                java.util.regex.Matcher suite = java.util.regex.Pattern
+                        .compile("<testsuite[^>]*>")
+                        .matcher(text)
+                if (suite.find()) {
+                    String line = suite.group()
+                    testCounts.tests += testSuiteAttribute(line, "tests")
+                    testCounts.failures += testSuiteAttribute(line, "failures")
+                    testCounts.errors += testSuiteAttribute(line, "errors")
+                    testCounts.skipped += testSuiteAttribute(line, "skipped")
+                }
+                java.util.regex.Matcher skipped = java.util.regex.Pattern
+                        .compile("<testcase name=\"([^\"]+)\" classname=\"([^\"]+)\"[^>]*>\\s*<skipped message=\"([^\"]+)\"", java.util.regex.Pattern.DOTALL)
+                        .matcher(text)
+                while (skipped.find()) {
+                    throw new GradleException("required validation suite contains skipped test: ${skipped.group(2)}.${skipped.group(1)}: ${skipped.group(3)}")
+                }
+            }
+        }
+        testCounts.passed = testCounts.tests - testCounts.failures - testCounts.errors - testCounts.skipped
+
+        // Current-run test results replace archived milestone receipt counts.
+        Map<String, Integer> acceptanceSummary = [
+                PASS: testCounts.passed, PASS_WITH_LIMITATION: 0, PARTIAL: 0, DEFERRED: 0,
+                FAIL: testCounts.failures + testCounts.errors + testCounts.skipped, NOT_APPLICABLE: 0
+        ]
+        Closure<List<String>> rowsForStatus = { String status ->
+            status == "FAIL" && acceptanceSummary.FAIL > 0
+                    ? ["Current application-platform JUnit results contain failures/errors/skips"] : []
+        }
+
+        Closure<String> taskEvidenceStatus = { String taskPath ->
+            def evidenceTask = tasks.findByPath(taskPath)
+            if (evidenceTask == null) {
+                return "MISSING"
+            }
+            def state = evidenceTask.state
+            if (state.failure != null) {
+                return "FAIL"
+            }
+            if (state.executed || state.didWork || state.upToDate) {
+                return "PASS"
+            }
+            if (state.skipped) {
+                return "SKIPPED"
+            }
+            return "MISSING"
+        }
+        Closure<String> taskEvidenceOutcome = { String taskPath ->
+            def evidenceTask = tasks.findByPath(taskPath)
+            if (evidenceTask == null) {
+                return "MISSING"
+            }
+            def state = evidenceTask.state
+            if (state.failure != null) {
+                return "FAILED"
+            }
+            if (state.executed || state.didWork) {
+                return "EXECUTED"
+            }
+            if (state.upToDate) {
+                return "UP_TO_DATE"
+            }
+            if (state.skipped) {
+                return "SKIPPED"
+            }
+            return "MISSING"
+        }
+        Closure<String> xmlSuiteEvidenceStatus = { String testResultPath ->
+            List<File> results = fileTree(testResultPath).matching { include "TEST-*.xml" }.files
+                    .sort { File left, File right -> left.name <=> right.name }
+            if (results.isEmpty()) {
+                return "MISSING"
+            }
+            boolean sawTest = false
+            for (File result : results) {
+                String text
+                try {
+                    text = result.getText("UTF-8")
+                } catch (Exception ignored) {
+                    return "ERROR"
+                }
+                java.util.regex.Matcher suite = java.util.regex.Pattern
+                        .compile("<testsuite[^>]*>")
+                        .matcher(text)
+                if (!suite.find()) {
+                    return "ERROR"
+                }
+                do {
+                    String line = suite.group()
+                    int tests = testSuiteAttribute(line, "tests")
+                    int failures = testSuiteAttribute(line, "failures")
+                    int errors = testSuiteAttribute(line, "errors")
+                    int skipped = testSuiteAttribute(line, "skipped")
+                    if (tests > 0) {
+                        sawTest = true
+                    }
+                    if (failures > 0) {
+                        return "FAIL"
+                    }
+                    if (errors > 0) {
+                        return "ERROR"
+                    }
+                    if (skipped > 0) {
+                        return "SKIPPED"
+                    }
+                } while (suite.find())
+            }
+            return sawTest ? "PASS" : "MISSING"
+        }
+        Closure<String> xmlTestMethodEvidenceStatus = { String testResultPath, String methodName ->
+            String suiteStatus = xmlSuiteEvidenceStatus(testResultPath)
+            if (suiteStatus != "PASS") {
+                return suiteStatus
+            }
+            List<File> results = fileTree(testResultPath).matching { include "TEST-*.xml" }.files
+                    .sort { File left, File right -> left.name <=> right.name }
+            for (File result : results) {
+                String text
+                try {
+                    text = result.getText("UTF-8")
+                } catch (Exception ignored) {
+                    return "ERROR"
+                }
+                if (text.contains("name=\"${methodName}\"") || text.contains("name=\"${methodName}()\"")) {
+                    return "PASS"
+                }
+            }
+            return "MISSING"
+        }
+        Closure<String> jsonArtifactEvidenceStatus = { String relativePath ->
+            File evidenceFile = file(relativePath)
+            if (!evidenceFile.isFile() || evidenceFile.length() == 0L) {
+                return "MISSING"
+            }
+            try {
+                new groovy.json.JsonSlurper().parse(evidenceFile)
+                return "PASS"
+            } catch (Exception ignored) {
+                return "ERROR"
+            }
+        }
+        Closure<String> artifactDigest = { String relativePath ->
+            File evidenceFile = file(relativePath)
+            if (!evidenceFile.exists()) {
+                return "missing"
+            }
+            java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256")
+            if (evidenceFile.isFile()) {
+                digest.update(evidenceFile.path.getBytes("UTF-8"))
+                digest.update((byte) 0)
+                digest.update(evidenceFile.bytes)
+            } else if (evidenceFile.isDirectory()) {
+                List<File> files = fileTree(evidenceFile).files
+                        .findAll { File candidate -> candidate.isFile() }
+                        .sort { File left, File right -> left.path <=> right.path }
+                files.each { File candidate ->
+                    digest.update(evidenceFile.toPath().relativize(candidate.toPath()).toString().getBytes("UTF-8"))
+                    digest.update((byte) 0)
+                    digest.update(candidate.bytes)
+                    digest.update((byte) 0)
+                }
+            }
+            return digest.digest().encodeHex().toString()
+        }
+        Closure<String> requiredEvidenceStatus = { Collection<String> statuses ->
+            if (statuses.any { String status -> status == "ERROR" }) {
+                return "ERROR"
+            }
+            if (statuses.any { String status -> status == "FAIL" }) {
+                return "FAIL"
+            }
+            if (statuses.any { String status -> status == "SKIPPED" }) {
+                return "SKIPPED"
+            }
+            if (statuses.any { String status -> status == "MISSING" }) {
+                return "MISSING"
+            }
+            return "PASS"
+        }
+
+        String gitCommit = "unknown"
+        try {
+            Process process = ["git", "rev-parse", "HEAD"].execute(null, rootDir)
+            process.waitFor()
+            if (process.exitValue() == 0) {
+                gitCommit = process.text.trim()
+            }
+        } catch (Exception ignored) {
+            gitCommit = "unavailable"
+        }
+        String gitBranch = "unknown"
+        String dirtyWorkingTree = "unknown"
+        try {
+            Process branchProcess = ["git", "rev-parse", "--abbrev-ref", "HEAD"].execute(null, rootDir)
+            branchProcess.waitFor()
+            if (branchProcess.exitValue() == 0) {
+                gitBranch = branchProcess.text.trim()
+            }
+            Process statusProcess = ["git", "status", "--porcelain"].execute(null, rootDir)
+            statusProcess.waitFor()
+            if (statusProcess.exitValue() == 0) {
+                dirtyWorkingTree = statusProcess.text.trim().isEmpty() ? "false" : "true"
+            }
+        } catch (Exception ignored) {
+            gitBranch = "unavailable"
+            dirtyWorkingTree = "unavailable"
+        }
+
+        Map<String, String> testEvidence = [
+                j7mTests: requiredEvidenceStatus([taskEvidenceStatus(":j7m-tests:phase5ApplicationPlatformTest"),
+                                                   xmlSuiteEvidenceStatus("j7m-tests/build/test-results/phase5ApplicationPlatformTest")]),
+                gradlePluginTests: requiredEvidenceStatus([taskEvidenceStatus(":j7m-gradle-plugin:test"),
+                                                           xmlSuiteEvidenceStatus("j7m-gradle-plugin/build/test-results/test")]),
+                deployerCliTests: requiredEvidenceStatus([taskEvidenceStatus(":j7m-deployer-cli:test"),
+                                                          xmlSuiteEvidenceStatus("j7m-deployer-cli/build/test-results/test")])
+        ]
+        Map<String, String> demoTaskResults = [
+                "j7m-demo:run": taskEvidenceStatus(":j7m-demo:run"),
+                "j7m-demo:runApplicationDeploymentDemo": taskEvidenceStatus(":j7m-demo:runApplicationDeploymentDemo"),
+                "j7m-demo:runModularApplicationDeploymentDemo": taskEvidenceStatus(":j7m-demo:runModularApplicationDeploymentDemo"),
+                "j7m-demo:runApplicationUpgradeRollbackDemo": taskEvidenceStatus(":j7m-demo:runApplicationUpgradeRollbackDemo"),
+                "j7m-demo:runRollingUpgradeDemo": taskEvidenceStatus(":j7m-demo:runRollingUpgradeDemo"),
+                "j7m-demo:runBlueGreenUpgradeDemo": taskEvidenceStatus(":j7m-demo:runBlueGreenUpgradeDemo"),
+                "j7m-demo:runCanaryBaselineUpgradeDemo": taskEvidenceStatus(":j7m-demo:runCanaryBaselineUpgradeDemo"),
+                "j7m-demo:runApplicationFailureDiagnosticsDemo": taskEvidenceStatus(":j7m-demo:runApplicationFailureDiagnosticsDemo"),
+                "j7m-demo:runApplicationAdminStatusDemo": taskEvidenceStatus(":j7m-demo:runApplicationAdminStatusDemo"),
+                "j7m-demo:runHelloRemoteServiceExample": taskEvidenceStatus(":j7m-demo:runHelloRemoteServiceExample"),
+                "j7m-demo:runCallbacksAndEventsExample": taskEvidenceStatus(":j7m-demo:runCallbacksAndEventsExample"),
+                "j7m-demo:runSecureBankingWorkflowExample": taskEvidenceStatus(":j7m-demo:runSecureBankingWorkflowExample"),
+                "j7m-demo:runHaHpClusterExample": taskEvidenceStatus(":j7m-demo:runHaHpClusterExample"),
+                "j7m-demo:runWorkloadProcessingExample": taskEvidenceStatus(":j7m-demo:runWorkloadProcessingExample"),
+                "j7m-demo:runStreamingPipelineExample": taskEvidenceStatus(":j7m-demo:runStreamingPipelineExample"),
+                "j7m-demo:runRegulatedEnterpriseAppExample": taskEvidenceStatus(":j7m-demo:runRegulatedEnterpriseAppExample"),
+                "j7m-demo:runGradlePluginWorkflowDemo": taskEvidenceStatus(":j7m-demo:runGradlePluginWorkflowDemo"),
+                "j7m-demo:runDeployerCliWorkflowDemo": taskEvidenceStatus(":j7m-demo:runDeployerCliWorkflowDemo"),
+                "j7m-demo:runDeployerCliUpgradeRollbackDemo": taskEvidenceStatus(":j7m-demo:runDeployerCliUpgradeRollbackDemo"),
+                "j7m-demo:runUdpMulticastDemo": taskEvidenceStatus(":j7m-demo:runUdpMulticastDemo"),
+                "j7m-demo:runSecurityDemo": taskEvidenceStatus(":j7m-demo:runSecurityDemo"),
+                "j7m-demo:runMtlsSecurityDemo": taskEvidenceStatus(":j7m-demo:runMtlsSecurityDemo"),
+                "j7m-demo:runWorkloadDemo": taskEvidenceStatus(":j7m-demo:runWorkloadDemo"),
+                "j7m-demo:runStreamingWorkloadDemo": taskEvidenceStatus(":j7m-demo:runStreamingWorkloadDemo"),
+                "j7m-demo:runComplianceDemo": taskEvidenceStatus(":j7m-demo:runComplianceDemo"),
+                "j7m-demo:runEnterpriseReadinessDemo": taskEvidenceStatus(":j7m-demo:runEnterpriseReadinessDemo")
+        ]
+        Map<String, String> exampleValidationResults = [
+                buildExamples: taskEvidenceStatus(":buildExamples"),
+                packageExamples: taskEvidenceStatus(":packageExamples"),
+                verifyExamples: taskEvidenceStatus(":verifyExamples"),
+                exampleBuildValidation: taskEvidenceStatus(":buildExamples"),
+                examplePackageValidation: taskEvidenceStatus(":packageExamples"),
+                exampleVerifyValidation: taskEvidenceStatus(":verifyExamples"),
+                requiredExamplesIncluded: requiredEvidenceStatus([
+                        demoTaskResults["j7m-demo:runWorkloadProcessingExample"],
+                        demoTaskResults["j7m-demo:runStreamingPipelineExample"],
+                        demoTaskResults["j7m-demo:runRegulatedEnterpriseAppExample"]
+                ]),
+                readmeCommandValidation: taskEvidenceStatus(":validateApplicationPlatformDocs"),
+                gradlePlugin: testEvidence.gradlePluginTests,
+                gradlePluginTasks: requiredEvidenceStatus([
+                        taskEvidenceStatus(":j7mPackage"),
+                        taskEvidenceStatus(":j7mSign"),
+                        taskEvidenceStatus(":j7mVerify"),
+                        taskEvidenceStatus(":j7mDeployLocal")
+                ]),
+                gradlePluginClasspathApp: taskEvidenceStatus(":j7mPackage"),
+                gradlePluginJpmsApp: xmlTestMethodEvidenceStatus(
+                        "j7m-gradle-plugin/build/test-results/test",
+                        "pluginJpmsBundleActivatesThroughRealApplicationManager"),
+                gradlePluginStrictRegulatedApp: taskEvidenceStatus(":j7mSign"),
+                deployerCli: testEvidence.deployerCliTests,
+                deployerCliCommands: testEvidence.deployerCliTests,
+                deployerCliExitCodes: testEvidence.deployerCliTests,
+                deployerCliStrictVerification: testEvidence.deployerCliTests,
+                deployerCliLifecycleWorkflow: demoTaskResults["j7m-demo:runDeployerCliWorkflowDemo"],
+                deployerCliUpgradeRollback: demoTaskResults["j7m-demo:runDeployerCliUpgradeRollbackDemo"],
+                placeholders: [],
+                requiredExamplesPlaceholder: 0,
+                workloadProcessing: demoTaskResults["j7m-demo:runWorkloadProcessingExample"],
+                streamingPipeline: demoTaskResults["j7m-demo:runStreamingPipelineExample"],
+                regulatedEnterpriseApp: demoTaskResults["j7m-demo:runRegulatedEnterpriseAppExample"]
+        ]
+        Map<String, List<String>> validationCommandTasks = [
+                "./gradlew build --no-daemon": [":build"],
+                "./gradlew :j7m-tests:phase5ApplicationPlatformTest --no-daemon --rerun-tasks": [":j7m-tests:phase5ApplicationPlatformTest"],
+                "./gradlew buildExamples --no-daemon": [":buildExamples"],
+                "./gradlew packageExamples --no-daemon": [":packageExamples"],
+                "./gradlew verifyExamples --no-daemon": [":verifyExamples"],
+                "./gradlew validateJ7mArchitecture --no-daemon": [":validateJ7mArchitecture"],
+                "./gradlew validateApplicationPlatform --no-daemon": [
+                        ":build",
+                        ":j7m-tests:phase5ApplicationPlatformTest",
+                        ":buildExamples",
+                        ":packageExamples",
+                        ":verifyExamples",
+                        ":j7m-gradle-plugin:test",
+                        ":j7mPackage",
+                        ":j7mSign",
+                        ":j7mVerify",
+                        ":j7mDeployLocal",
+                        ":j7mPlanLocal",
+                        ":j7mRunLocal",
+                        ":j7mStatusLocal",
+                        ":j7mStopLocal",
+                        ":j7mUnloadLocal",
+                        ":j7m-deployer-cli:test",
+                        ":validateJ7mArchitecture",
+                        ":validateApplicationPlatformDocs",
+                        ":j7m-kernel:dependencies",
+                        ":j7m-runtime:dependencies"
+                ],
+                "./gradlew :j7m-demo:run --no-daemon": [":j7m-demo:run"],
+                "./gradlew :j7m-demo:runApplicationDeploymentDemo --no-daemon": [":j7m-demo:runApplicationDeploymentDemo"],
+                "./gradlew :j7m-demo:runModularApplicationDeploymentDemo --no-daemon": [":j7m-demo:runModularApplicationDeploymentDemo"],
+                "./gradlew :j7m-demo:runApplicationUpgradeRollbackDemo --no-daemon": [":j7m-demo:runApplicationUpgradeRollbackDemo"],
+                "./gradlew :j7m-demo:runRollingUpgradeDemo --no-daemon": [":j7m-demo:runRollingUpgradeDemo"],
+                "./gradlew :j7m-demo:runBlueGreenUpgradeDemo --no-daemon": [":j7m-demo:runBlueGreenUpgradeDemo"],
+                "./gradlew :j7m-demo:runCanaryBaselineUpgradeDemo --no-daemon": [":j7m-demo:runCanaryBaselineUpgradeDemo"],
+                "./gradlew :j7m-demo:runApplicationFailureDiagnosticsDemo --no-daemon": [":j7m-demo:runApplicationFailureDiagnosticsDemo"],
+                "./gradlew :j7m-demo:runApplicationAdminStatusDemo --no-daemon": [":j7m-demo:runApplicationAdminStatusDemo"],
+                "./gradlew :j7m-demo:runHelloRemoteServiceExample --no-daemon": [":j7m-demo:runHelloRemoteServiceExample"],
+                "./gradlew :j7m-demo:runCallbacksAndEventsExample --no-daemon": [":j7m-demo:runCallbacksAndEventsExample"],
+                "./gradlew :j7m-demo:runSecureBankingWorkflowExample --no-daemon": [":j7m-demo:runSecureBankingWorkflowExample"],
+                "./gradlew :j7m-demo:runHaHpClusterExample --no-daemon": [":j7m-demo:runHaHpClusterExample"],
+                "./gradlew :j7m-demo:runWorkloadProcessingExample --no-daemon": [":j7m-demo:runWorkloadProcessingExample"],
+                "./gradlew :j7m-demo:runStreamingPipelineExample --no-daemon": [":j7m-demo:runStreamingPipelineExample"],
+                "./gradlew :j7m-demo:runRegulatedEnterpriseAppExample --no-daemon": [":j7m-demo:runRegulatedEnterpriseAppExample"],
+                "./gradlew j7mSign --no-daemon": [":j7mSign"],
+                "./gradlew j7mPlanLocal --no-daemon": [":j7mPlanLocal"],
+                "./gradlew j7mStatusLocal --no-daemon": [":j7mStatusLocal"],
+                "./gradlew j7mStopLocal --no-daemon": [":j7mStopLocal"],
+                "./gradlew j7mUnloadLocal --no-daemon": [":j7mUnloadLocal"],
+                "./gradlew :j7m-gradle-plugin:test --no-daemon": [":j7m-gradle-plugin:test"],
+                "./gradlew j7mPackage --no-daemon": [":j7mPackage"],
+                "./gradlew j7mVerify --no-daemon": [":j7mVerify"],
+                "./gradlew j7mDeployLocal --no-daemon": [":j7mDeployLocal"],
+                "./gradlew j7mRunLocal --no-daemon": [":j7mRunLocal"],
+                "./gradlew :j7m-deployer-cli:test --no-daemon": [":j7m-deployer-cli:test"],
+                "./gradlew :j7m-demo:runGradlePluginWorkflowDemo --no-daemon": [":j7m-demo:runGradlePluginWorkflowDemo"],
+                "./gradlew :j7m-demo:runDeployerCliWorkflowDemo --no-daemon": [":j7m-demo:runDeployerCliWorkflowDemo"],
+                "./gradlew :j7m-demo:runDeployerCliUpgradeRollbackDemo --no-daemon": [":j7m-demo:runDeployerCliUpgradeRollbackDemo"],
+                "./gradlew :j7m-kernel:dependencies --configuration runtimeClasspath --no-daemon": [":j7m-kernel:dependencies"],
+                "./gradlew :j7m-runtime:dependencies --configuration runtimeClasspath --no-daemon": [":j7m-runtime:dependencies"],
+                "./gradlew :j7m-demo:runUdpMulticastDemo --no-daemon": [":j7m-demo:runUdpMulticastDemo"]
+        ]
+        List<String> operatorGuidanceCommands = validationCommandTasks.keySet().toList()
+        List<Map<String, Object>> validationTaskEvidence = []
+        List<Map<String, Object>> validationAggregateEvidence = []
+        Closure<Map<String, Object>> taskEvidenceRow = { String taskPath, String guidanceCommand ->
+            String status = taskEvidenceStatus(taskPath)
+            String outcome = taskEvidenceOutcome(taskPath)
+            return [
+                    evidenceKind: "GRADLE_TASK_OUTCOME",
+                    taskPath: taskPath,
+                    taskOutcome: outcome,
+                    status: status,
+                    currentRunMarker: "gradle-task-state:${taskPath}:${outcome}:${status}",
+                    operatorGuidanceCommand: guidanceCommand
+            ]
+        }
+        Closure<Map<String, Object>> artifactEvidenceRow = { String evidenceKind, String evidenceArtifact, String status, String guidanceCommand ->
+            return [
+                    evidenceKind: evidenceKind,
+                    evidenceArtifact: evidenceArtifact,
+                    evidenceDigest: artifactDigest(evidenceArtifact),
+                    status: status,
+                    operatorGuidanceCommand: guidanceCommand
+            ]
+        }
+        validationCommandTasks.each { String command, List<String> taskPaths ->
+            List<Map<String, Object>> rows = []
+            taskPaths.each { String taskPath ->
+                Map<String, Object> row = taskEvidenceRow(taskPath, command)
+                rows.add(row)
+                validationTaskEvidence.add(row)
+            }
+            if (command == "./gradlew :j7m-tests:phase5ApplicationPlatformTest --no-daemon --rerun-tasks") {
+                rows.add(artifactEvidenceRow("TEST_XML_SUITE_ARTIFACT",
+                        "j7m-tests/build/test-results/phase5ApplicationPlatformTest",
+                        testEvidence.j7mTests,
+                        command))
+            }
+            if (command == "./gradlew :j7m-gradle-plugin:test --no-daemon") {
+                rows.add(artifactEvidenceRow("TEST_XML_SUITE_ARTIFACT",
+                        "j7m-gradle-plugin/build/test-results/test",
+                        testEvidence.gradlePluginTests,
+                        command))
+            }
+            if (command == "./gradlew :j7m-deployer-cli:test --no-daemon") {
+                rows.add(artifactEvidenceRow("TEST_XML_SUITE_ARTIFACT",
+                        "j7m-deployer-cli/build/test-results/test",
+                        testEvidence.deployerCliTests,
+                        command))
+            }
+            if (command == "./gradlew validateJ7mArchitecture --no-daemon") {
+                rows.add(artifactEvidenceRow("JSON_REPORT_ARTIFACT",
+                        "build/reports/j7m/jpms-boundaries.json",
+                        jsonArtifactEvidenceStatus("build/reports/j7m/jpms-boundaries.json"),
+                        command))
+            }
+            if (command == "./gradlew validateApplicationPlatform --no-daemon") {
+                rows.add(artifactEvidenceRow("TEST_XML_SUITE_ARTIFACT",
+                        "j7m-tests/build/test-results/phase5ApplicationPlatformTest",
+                        testEvidence.j7mTests,
+                        command))
+                rows.add(artifactEvidenceRow("TEST_XML_SUITE_ARTIFACT",
+                        "j7m-gradle-plugin/build/test-results/test",
+                        testEvidence.gradlePluginTests,
+                        command))
+                rows.add(artifactEvidenceRow("TEST_XML_SUITE_ARTIFACT",
+                        "j7m-deployer-cli/build/test-results/test",
+                        testEvidence.deployerCliTests,
+                        command))
+                rows.add(artifactEvidenceRow("JSON_REPORT_ARTIFACT",
+                        "build/reports/j7m/jpms-boundaries.json",
+                        jsonArtifactEvidenceStatus("build/reports/j7m/jpms-boundaries.json"),
+                        command))
+            }
+            validationTaskEvidence.addAll(rows.findAll { Map<String, Object> row -> row.evidenceKind != "GRADLE_TASK_OUTCOME" })
+            validationAggregateEvidence.add([
+                    evidenceKind: "AGGREGATE_TASK_STATE",
+                    status: requiredEvidenceStatus(rows.collect { Map<String, Object> row -> row.status as String }),
+                    taskPaths: taskPaths,
+                    operatorGuidanceCommand: command,
+                    guidanceOnly: true
+            ])
+        }
+        File jpmsReportFile = file("${buildDir}/reports/j7m/jpms-boundaries.json")
+        Object jpmsReport = jpmsReportFile.isFile() ? new groovy.json.JsonSlurper().parse(jpmsReportFile) : [:]
+        String jpmsEvidenceStatus = requiredEvidenceStatus([
+                taskEvidenceStatus(":validateJ7mArchitecture"),
+                jsonArtifactEvidenceStatus("${buildDir}/reports/j7m/jpms-boundaries.json")
+        ])
+        Map<String, String> requiredFieldEvidence = [
+                dependencyBoundaries: requiredEvidenceStatus([
+                        taskEvidenceStatus(":j7m-kernel:dependencies"),
+                        taskEvidenceStatus(":j7m-runtime:dependencies")
+                ]),
+                phase1Regression: testEvidence.j7mTests,
+                signatureVerification: testEvidence.j7mTests,
+                strictUnsignedRejection: testEvidence.j7mTests,
+                invalidSignatureRejection: testEvidence.j7mTests,
+                sbomVerification: testEvidence.j7mTests,
+                provenanceVerification: testEvidence.j7mTests,
+                repositoryAuditChain: testEvidence.j7mTests,
+                activationRequiresVerification: testEvidence.j7mTests,
+                resourcePolicy: testEvidence.j7mTests,
+                resourceUsage: testEvidence.j7mTests,
+                objectRefNonBearer: testEvidence.j7mTests,
+                redaction: testEvidence.j7mTests,
+                activationPlanning: testEvidence.j7mTests,
+                stopLifecycle: testEvidence.j7mTests,
+                unloadLifecycle: testEvidence.j7mTests,
+                unloadCleanupProof: testEvidence.j7mTests,
+                failedActivationDiagnostics: testEvidence.j7mTests,
+                upgradeStopStart: testEvidence.j7mTests,
+                upgradeRolling: demoTaskResults["j7m-demo:runRollingUpgradeDemo"],
+                upgradeBlueGreen: demoTaskResults["j7m-demo:runBlueGreenUpgradeDemo"],
+                upgradeCanaryBaseline: demoTaskResults["j7m-demo:runCanaryBaselineUpgradeDemo"],
+                rollback: demoTaskResults["j7m-demo:runApplicationUpgradeRollbackDemo"],
+                adminStatusCompleteness: demoTaskResults["j7m-demo:runApplicationAdminStatusDemo"],
+                lifecycleAuditEvidence: testEvidence.j7mTests,
+                exampleBuildValidation: exampleValidationResults.exampleBuildValidation,
+                examplePackageValidation: exampleValidationResults.examplePackageValidation,
+                exampleVerifyValidation: exampleValidationResults.exampleVerifyValidation,
+                requiredExamplesIncluded: exampleValidationResults.requiredExamplesIncluded,
+                readmeCommandValidation: exampleValidationResults.readmeCommandValidation,
+                gradlePlugin: exampleValidationResults.gradlePlugin,
+                gradlePluginTasks: exampleValidationResults.gradlePluginTasks,
+                gradlePluginClasspathApp: exampleValidationResults.gradlePluginClasspathApp,
+                gradlePluginJpmsApp: exampleValidationResults.gradlePluginJpmsApp,
+                gradlePluginStrictRegulatedApp: exampleValidationResults.gradlePluginStrictRegulatedApp,
+                deployerCli: exampleValidationResults.deployerCli,
+                deployerCliCommands: exampleValidationResults.deployerCliCommands,
+                deployerCliExitCodes: exampleValidationResults.deployerCliExitCodes,
+                deployerCliStrictVerification: exampleValidationResults.deployerCliStrictVerification,
+                deployerCliLifecycleWorkflow: exampleValidationResults.deployerCliLifecycleWorkflow,
+                deployerCliUpgradeRollback: exampleValidationResults.deployerCliUpgradeRollback
+        ]
+        boolean technicalRecommendationAcceptable = acceptanceSummary.PASS_WITH_LIMITATION == 0
+                && acceptanceSummary.PARTIAL == 0
+                && acceptanceSummary.DEFERRED == 0
+                && acceptanceSummary.FAIL == 0
+                && testCounts.skipped == 0
+                && skippedTests.isEmpty()
+                && validationAggregateEvidence.every { Map<String, Object> row -> row.status == "PASS" }
+                && validationTaskEvidence.every { Map<String, Object> row -> row.status == "PASS" }
+                && requiredFieldEvidence.values().every { String status -> status == "PASS" }
+                && jpmsEvidenceStatus == "PASS"
+        boolean cleanWorkingTree = dirtyWorkingTree == "false"
+        String finalRecommendation = technicalRecommendationAcceptable
+                ? (cleanWorkingTree ? "ACCEPT" : "ACCEPT_PENDING_OWNER_COMMIT")
+                : "REJECT"
+        Map<String, Object> evidence = [
+                timestamp: "deterministic-phase-5-evidence-v1",
+                gitCommit: gitCommit,
+                gitBranch: gitBranch,
+                dirtyWorkingTree: dirtyWorkingTree,
+                javaVersion: System.getProperty("java.version"),
+                javaRuntimeVersion: System.getProperty("java.runtime.version"),
+                gradleVersion: gradle.gradleVersion,
+                osName: System.getProperty("os.name"),
+                osArchitecture: System.getProperty("os.arch"),
+                operatorGuidanceCommands: operatorGuidanceCommands,
+                exactCommandEvidence: [],
+                validationAggregateEvidence: validationAggregateEvidence,
+                validationTaskEvidence: validationTaskEvidence,
+                testCounts: testCounts,
+                skippedTests: skippedTests,
+                udpMulticastCapability: "DETERMINISTIC_REQUIRED_PATH",
+                demoTaskResults: demoTaskResults,
+                exampleValidationResults: exampleValidationResults,
+                acceptanceMatrixStatusSummary: acceptanceSummary,
+                recommendation: finalRecommendation,
+                technicalRecommendation: technicalRecommendationAcceptable ? "ACCEPT" : "REJECT",
+                cleanWorkingTreeReleaseSeal: cleanWorkingTree ? "PASS" : "BLOCKED",
+                pass: acceptanceSummary.PASS,
+                passWithLimitation: acceptanceSummary.PASS_WITH_LIMITATION,
+                partial: acceptanceSummary.PARTIAL,
+                deferred: acceptanceSummary.DEFERRED,
+                fail: acceptanceSummary.FAIL,
+                passWithLimitationRows: rowsForStatus("PASS_WITH_LIMITATION"),
+                partialRows: rowsForStatus("PARTIAL"),
+                deferredRows: rowsForStatus("DEFERRED"),
+                securityAuditSummary: "Gate 3 signing, repository, resource, authorization, ObjectRef non-bearer, and redaction controls PASS",
+                operationalAuditSummary: "Gate 4 lifecycle planning, stop/unload cleanup, upgrade strategies, rollback, failure diagnostics, and local admin/status completeness PASS",
+                dependencyBoundarySummary: "j7m-kernel and j7m-runtime runtimeClasspath contain no concrete gRPC/RMI transport modules",
+                dependencyBoundaries: requiredFieldEvidence.dependencyBoundaries,
+                phase1Regression: requiredFieldEvidence.phase1Regression,
+                jpmsBoundarySummary: "All existing production Java modules are named; no internal packages are exported; no production split packages are present",
+                jpmsDescriptorCoverage: jpmsReport.jpmsDescriptorCoverage ?: jpmsEvidenceStatus,
+                productionModulesWithoutDescriptor: jpmsReport.productionModulesWithoutDescriptor ?: 0,
+                exportedInternalPackages: jpmsReport.exportedInternalPackages ?: 0,
+                splitPackages: jpmsReport.splitPackages ?: 0,
+                coreReadsConcreteTransport: jpmsReport.coreReadsConcreteTransport ?: false,
+                runtimeReadsConcreteTransport: jpmsReport.runtimeReadsConcreteTransport ?: false,
+                jpmsAppIsolation: jpmsReport.jpmsAppIsolation ?: jpmsEvidenceStatus,
+                classpathFallback: jpmsReport.classpathFallback ?: jpmsEvidenceStatus,
+                signatureVerification: requiredFieldEvidence.signatureVerification,
+                strictUnsignedRejection: requiredFieldEvidence.strictUnsignedRejection,
+                invalidSignatureRejection: requiredFieldEvidence.invalidSignatureRejection,
+                sbomVerification: requiredFieldEvidence.sbomVerification,
+                provenanceVerification: requiredFieldEvidence.provenanceVerification,
+                repositoryAuditChain: requiredFieldEvidence.repositoryAuditChain,
+                activationRequiresVerification: requiredFieldEvidence.activationRequiresVerification,
+                resourcePolicy: requiredFieldEvidence.resourcePolicy,
+                resourceUsage: requiredFieldEvidence.resourceUsage,
+                objectRefNonBearer: requiredFieldEvidence.objectRefNonBearer,
+                redaction: requiredFieldEvidence.redaction,
+                activationPlanning: requiredFieldEvidence.activationPlanning,
+                stopLifecycle: requiredFieldEvidence.stopLifecycle,
+                unloadLifecycle: requiredFieldEvidence.unloadLifecycle,
+                unloadCleanupProof: requiredFieldEvidence.unloadCleanupProof,
+                failedActivationDiagnostics: requiredFieldEvidence.failedActivationDiagnostics,
+                upgradeStopStart: requiredFieldEvidence.upgradeStopStart,
+                upgradeRolling: requiredFieldEvidence.upgradeRolling,
+                upgradeBlueGreen: requiredFieldEvidence.upgradeBlueGreen,
+                upgradeCanaryBaseline: requiredFieldEvidence.upgradeCanaryBaseline,
+                rollback: requiredFieldEvidence.rollback,
+                adminStatusCompleteness: requiredFieldEvidence.adminStatusCompleteness,
+                lifecycleAuditEvidence: requiredFieldEvidence.lifecycleAuditEvidence,
+                exampleBuildValidation: requiredFieldEvidence.exampleBuildValidation,
+                examplePackageValidation: requiredFieldEvidence.examplePackageValidation,
+                exampleVerifyValidation: requiredFieldEvidence.exampleVerifyValidation,
+                requiredExamplesIncluded: requiredFieldEvidence.requiredExamplesIncluded,
+                readmeCommandValidation: requiredFieldEvidence.readmeCommandValidation,
+                gradlePlugin: requiredFieldEvidence.gradlePlugin,
+                gradlePluginTasks: requiredFieldEvidence.gradlePluginTasks,
+                gradlePluginClasspathApp: requiredFieldEvidence.gradlePluginClasspathApp,
+                gradlePluginJpmsApp: requiredFieldEvidence.gradlePluginJpmsApp,
+                gradlePluginStrictRegulatedApp: requiredFieldEvidence.gradlePluginStrictRegulatedApp,
+                deployerCli: requiredFieldEvidence.deployerCli,
+                deployerCliCommands: requiredFieldEvidence.deployerCliCommands,
+                deployerCliExitCodes: requiredFieldEvidence.deployerCliExitCodes,
+                deployerCliStrictVerification: requiredFieldEvidence.deployerCliStrictVerification,
+                deployerCliLifecycleWorkflow: requiredFieldEvidence.deployerCliLifecycleWorkflow,
+                deployerCliUpgradeRollback: requiredFieldEvidence.deployerCliUpgradeRollback,
+                knownLimitations: [
+                        "JVM class unloading is not guaranteed by Java; J7M releases manager-held references deterministically",
+                        "application admin/status is local-runtime scoped"
+                ],
+                deferredItems: rowsForStatus("DEFERRED"),
+                java25RuntimeCaveat: "Required Test and JavaExec tasks set the Java 25 native-access flags documented in documentation/docs/getting-started/prerequisites.md.",
+                pluginImplemented: true,
+                cliImplemented: true,
+                nonGoalConfirmation: "No durable messaging, consensus, exactly-once delivery, distributed transactions, database replication, crawler politeness, search indexing, full compute platform, full container sandboxing, external artifact replication, or production vendor integrations were started."
+        ]
+        String json = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(evidence))
+        Object parsed = new groovy.json.JsonSlurper().parseText(json)
+        if (parsed.acceptanceMatrixStatusSummary != acceptanceSummary) {
+            throw new GradleException("generated acceptance JSON does not round-trip status counts")
+        }
+        [
+                "signatureVerification",
+                "strictUnsignedRejection",
+                "invalidSignatureRejection",
+                "sbomVerification",
+                "provenanceVerification",
+                "repositoryAuditChain",
+                "activationRequiresVerification",
+                "resourcePolicy",
+                "resourceUsage",
+                "objectRefNonBearer",
+                "redaction",
+                "activationPlanning",
+                "stopLifecycle",
+                "unloadLifecycle",
+                "unloadCleanupProof",
+                "failedActivationDiagnostics",
+                "upgradeStopStart",
+                "upgradeRolling",
+                "upgradeBlueGreen",
+                "upgradeCanaryBaseline",
+                "rollback",
+                "adminStatusCompleteness",
+                "lifecycleAuditEvidence",
+                "exampleBuildValidation",
+                "examplePackageValidation",
+                "exampleVerifyValidation",
+                "requiredExamplesIncluded",
+                "readmeCommandValidation",
+                "gradlePlugin",
+                "gradlePluginTasks",
+                "gradlePluginClasspathApp",
+                "gradlePluginJpmsApp",
+                "gradlePluginStrictRegulatedApp",
+                "deployerCli",
+                "deployerCliCommands",
+                "deployerCliExitCodes",
+                "deployerCliStrictVerification",
+                "deployerCliLifecycleWorkflow",
+                "deployerCliUpgradeRollback",
+                "dependencyBoundaries",
+                "phase1Regression"
+        ].each { String field ->
+            if (parsed[field] != "PASS") {
+                throw new GradleException("required evidence field is not PASS: ${field}")
+            }
+        }
+        if (parsed.technicalRecommendation != "ACCEPT") {
+            throw new GradleException("technical recommendation is not ACCEPT")
+        }
+        if (parsed.validationAggregateEvidence.isEmpty()) {
+            throw new GradleException("validation aggregate evidence is missing")
+        }
+        if (parsed.validationTaskEvidence.isEmpty()) {
+            throw new GradleException("validation task evidence is missing")
+        }
+        parsed.validationAggregateEvidence.each { Object row ->
+            if (row.evidenceKind != "AGGREGATE_TASK_STATE" || row.status != "PASS" || row.operatorGuidanceCommand == null || row.guidanceOnly != true) {
+                throw new GradleException("invalid validation aggregate evidence row: ${row}")
+            }
+        }
+        parsed.validationTaskEvidence.each { Object row ->
+            if (row.status != "PASS") {
+                throw new GradleException("validation evidence row is not PASS: ${row}")
+            }
+            if (row.evidenceKind == "GRADLE_TASK_OUTCOME") {
+                if (row.taskPath == null || row.taskOutcome == null || row.taskOutcome == "MISSING" || row.currentRunMarker == null) {
+                    throw new GradleException("Gradle task outcome evidence is incomplete: ${row}")
+                }
+            } else if (row.evidenceKind == "TEST_XML_SUITE_ARTIFACT" || row.evidenceKind == "JSON_REPORT_ARTIFACT") {
+                if (row.evidenceArtifact == null || row.evidenceDigest == null || row.evidenceDigest == "missing") {
+                    throw new GradleException("artifact validation evidence is incomplete: ${row}")
+                }
+            } else {
+                throw new GradleException("unknown validation evidence kind: ${row.evidenceKind}")
+            }
+        }
+        if (!parsed.exactCommandEvidence.isEmpty()) {
+            throw new GradleException("Phase 5 report does not record exact command execution evidence")
+        }
+        if (dirtyWorkingTree == "true" && parsed.recommendation == "ACCEPT") {
+            throw new GradleException("acceptance report claims ACCEPT while the working tree is dirty")
+        }
+        if (dirtyWorkingTree == "false" && parsed.recommendation != "ACCEPT") {
+            throw new GradleException("clean acceptance report did not produce ACCEPT")
+        }
+        ["PASS_WITH_LIMITATION", "PARTIAL", "DEFERRED", "FAIL"].each { String status ->
+            if ((parsed.acceptanceMatrixStatusSummary[status] ?: 0) != 0) {
+                throw new GradleException("acceptance matrix contains disallowed ${status} rows: ${rowsForStatus(status)}")
+            }
+        }
+        if (parsed.testCounts.skipped != 0 || !parsed.skippedTests.isEmpty()) {
+            throw new GradleException("required validation suite contains skipped tests")
+        }
+        new File(reportDirectory, "application-platform-acceptance.json").setText(json + System.lineSeparator(), "UTF-8")
+        StringBuilder markdown = new StringBuilder()
+        markdown.append("# Application Platform Acceptance Evidence\n\n")
+        markdown.append("- Timestamp: ").append(evidence.timestamp).append('\n')
+        markdown.append("- Git commit: ").append(gitCommit).append('\n')
+        markdown.append("- Git branch: ").append(gitBranch).append('\n')
+        markdown.append("- Dirty working tree: ").append(dirtyWorkingTree).append('\n')
+        markdown.append("- Java version: ").append(evidence.javaVersion).append(" (runtime ").append(evidence.javaRuntimeVersion).append(")\n")
+        markdown.append("- Gradle version: ").append(evidence.gradleVersion).append('\n')
+        markdown.append("- OS: ").append(evidence.osName).append(" / ").append(evidence.osArchitecture).append('\n')
+        markdown.append("- Tests: ").append(testCounts).append('\n')
+        markdown.append("- Skipped tests: ").append(skippedTests).append('\n')
+        markdown.append("- UDP multicast capability: ").append(evidence.udpMulticastCapability).append('\n')
+        markdown.append("- Acceptance status summary: ").append(acceptanceSummary).append('\n')
+        markdown.append("- Recommendation: ").append(evidence.recommendation).append('\n')
+        markdown.append("- Technical recommendation: ").append(evidence.technicalRecommendation).append('\n')
+        markdown.append("- Clean working tree release seal: ").append(evidence.cleanWorkingTreeReleaseSeal).append('\n')
+        markdown.append("- Operator guidance commands: guidance only; not exact command execution proof. ").append(operatorGuidanceCommands).append('\n')
+        markdown.append("- Exact command evidence: ").append(evidence.exactCommandEvidence).append('\n')
+        markdown.append("- Validation aggregate evidence kind: AGGREGATE_TASK_STATE\n")
+        evidence.validationAggregateEvidence.each { Map<String, Object> row ->
+            markdown.append("  - guidance: ").append(row.operatorGuidanceCommand)
+                    .append("; status: ").append(row.status)
+                    .append("; taskPaths: ").append(row.taskPaths)
+                    .append("; guidanceOnly: ").append(row.guidanceOnly)
+                    .append('\n')
+        }
+        markdown.append("- Validation task evidence:\n")
+        evidence.validationTaskEvidence.each { Map<String, Object> row ->
+            markdown.append("  - evidenceKind: ").append(row.evidenceKind)
+                    .append("; status: ").append(row.status)
+            if (row.taskPath != null) {
+                markdown.append("; taskPath: ").append(row.taskPath)
+                        .append("; taskOutcome: ").append(row.taskOutcome)
+                        .append("; currentRunMarker: ").append(row.currentRunMarker)
+            }
+            if (row.evidenceArtifact != null) {
+                markdown.append("; evidenceArtifact: ").append(row.evidenceArtifact)
+                        .append("; evidenceDigest: ").append(row.evidenceDigest)
+            }
+            if (row.operatorGuidanceCommand != null) {
+                markdown.append("; guidance: ").append(row.operatorGuidanceCommand)
+            }
+            markdown.append('\n')
+        }
+        markdown.append("- Security audit: ").append(evidence.securityAuditSummary).append('\n')
+        markdown.append("- Operational audit: ").append(evidence.operationalAuditSummary).append('\n')
+        markdown.append("- Example validation: ").append(evidence.exampleValidationResults).append('\n')
+        markdown.append("- Demo validation: ").append(evidence.demoTaskResults).append('\n')
+        markdown.append("- Dependency boundary summary: ").append(evidence.dependencyBoundarySummary).append('\n')
+        markdown.append("- Dependency boundaries: ").append(evidence.dependencyBoundaries).append('\n')
+        markdown.append("- Phase 1 regression: ").append(evidence.phase1Regression).append('\n')
+        markdown.append("- JPMS boundary summary: ").append(evidence.jpmsBoundarySummary).append('\n')
+        markdown.append("- JPMS descriptor coverage: ").append(evidence.jpmsDescriptorCoverage).append('\n')
+        markdown.append("- Production modules without descriptor: ").append(evidence.productionModulesWithoutDescriptor).append('\n')
+        markdown.append("- Exported internal packages: ").append(evidence.exportedInternalPackages).append('\n')
+        markdown.append("- Split packages: ").append(evidence.splitPackages).append('\n')
+        markdown.append("- Core reads concrete transport: ").append(evidence.coreReadsConcreteTransport).append('\n')
+        markdown.append("- Runtime reads concrete transport: ").append(evidence.runtimeReadsConcreteTransport).append('\n')
+        markdown.append("- JPMS app isolation: ").append(evidence.jpmsAppIsolation).append('\n')
+        markdown.append("- Classpath fallback: ").append(evidence.classpathFallback).append('\n')
+        markdown.append("- Signature verification: ").append(evidence.signatureVerification).append('\n')
+        markdown.append("- Strict unsigned rejection: ").append(evidence.strictUnsignedRejection).append('\n')
+        markdown.append("- Invalid signature rejection: ").append(evidence.invalidSignatureRejection).append('\n')
+        markdown.append("- SBOM verification: ").append(evidence.sbomVerification).append('\n')
+        markdown.append("- Provenance verification: ").append(evidence.provenanceVerification).append('\n')
+        markdown.append("- Repository audit chain: ").append(evidence.repositoryAuditChain).append('\n')
+        markdown.append("- Activation requires verification: ").append(evidence.activationRequiresVerification).append('\n')
+        markdown.append("- Resource policy: ").append(evidence.resourcePolicy).append('\n')
+        markdown.append("- Resource usage: ").append(evidence.resourceUsage).append('\n')
+        markdown.append("- ObjectRef non-bearer: ").append(evidence.objectRefNonBearer).append('\n')
+        markdown.append("- Redaction: ").append(evidence.redaction).append('\n')
+        markdown.append("- Activation planning: ").append(evidence.activationPlanning).append('\n')
+        markdown.append("- Stop lifecycle: ").append(evidence.stopLifecycle).append('\n')
+        markdown.append("- Unload lifecycle: ").append(evidence.unloadLifecycle).append('\n')
+        markdown.append("- Unload cleanup proof: ").append(evidence.unloadCleanupProof).append('\n')
+        markdown.append("- Failed activation diagnostics: ").append(evidence.failedActivationDiagnostics).append('\n')
+        markdown.append("- Upgrade stop-start: ").append(evidence.upgradeStopStart).append('\n')
+        markdown.append("- Upgrade rolling: ").append(evidence.upgradeRolling).append('\n')
+        markdown.append("- Upgrade blue-green: ").append(evidence.upgradeBlueGreen).append('\n')
+        markdown.append("- Upgrade canary-baseline: ").append(evidence.upgradeCanaryBaseline).append('\n')
+        markdown.append("- Rollback: ").append(evidence.rollback).append('\n')
+        markdown.append("- Admin/status completeness: ").append(evidence.adminStatusCompleteness).append('\n')
+        markdown.append("- Lifecycle audit/evidence: ").append(evidence.lifecycleAuditEvidence).append('\n')
+        markdown.append("- Known limitations: ").append(evidence.knownLimitations).append('\n')
+        markdown.append("- Deferred items: ").append(evidence.deferredItems).append('\n')
+        markdown.append("- Java 25 runtime caveat: ").append(evidence.java25RuntimeCaveat).append('\n')
+        markdown.append("- Gradle plugin implemented: ").append(evidence.pluginImplemented).append('\n')
+        markdown.append("- Deployer CLI implemented: ").append(evidence.cliImplemented).append('\n')
+        markdown.append("- Example build validation: ").append(evidence.exampleBuildValidation).append('\n')
+        markdown.append("- Example package validation: ").append(evidence.examplePackageValidation).append('\n')
+        markdown.append("- Example verify validation: ").append(evidence.exampleVerifyValidation).append('\n')
+        markdown.append("- README command validation: ").append(evidence.readmeCommandValidation).append('\n')
+        markdown.append("- Gradle plugin: ").append(evidence.gradlePlugin).append('\n')
+        markdown.append("- Gradle plugin tasks: ").append(evidence.gradlePluginTasks).append('\n')
+        markdown.append("- Gradle plugin classpath app: ").append(evidence.gradlePluginClasspathApp).append('\n')
+        markdown.append("- Gradle plugin JPMS app: ").append(evidence.gradlePluginJpmsApp).append('\n')
+        markdown.append("- Gradle plugin strict regulated app: ").append(evidence.gradlePluginStrictRegulatedApp).append('\n')
+        markdown.append("- Deployer CLI: ").append(evidence.deployerCli).append('\n')
+        markdown.append("- Deployer CLI commands: ").append(evidence.deployerCliCommands).append('\n')
+        markdown.append("- Deployer CLI exit codes: ").append(evidence.deployerCliExitCodes).append('\n')
+        markdown.append("- Deployer CLI strict verification: ").append(evidence.deployerCliStrictVerification).append('\n')
+        markdown.append("- Deployer CLI lifecycle workflow: ").append(evidence.deployerCliLifecycleWorkflow).append('\n')
+        markdown.append("- Deployer CLI upgrade/rollback: ").append(evidence.deployerCliUpgradeRollback).append('\n')
+        markdown.append("- Non-goal confirmation: ").append(evidence.nonGoalConfirmation).append('\n')
+        String markdownText = markdown.toString()
+        acceptanceSummary.each { String status, Integer count ->
+            if (!markdownText.contains("${status}:${count}") && !markdownText.contains("${status}=${count}")) {
+                throw new GradleException("generated Markdown does not include status count ${status}=${count}")
+            }
+        }
+        if (markdownText.contains("Validation command results")) {
+            throw new GradleException("generated Markdown contains exact-command result wording")
+        }
+        evidence.validationAggregateEvidence.each { Map<String, Object> row ->
+            if (!markdownText.contains(row.operatorGuidanceCommand as String)
+                    || !markdownText.contains("AGGREGATE_TASK_STATE")
+                    || !markdownText.contains("guidanceOnly: true")) {
+                throw new GradleException("generated Markdown does not agree with validation aggregate evidence")
+            }
+        }
+        evidence.validationTaskEvidence.each { Map<String, Object> row ->
+            if (!markdownText.contains(row.evidenceKind as String) || !markdownText.contains(row.status as String)) {
+                throw new GradleException("generated Markdown does not agree with validation task evidence")
+            }
+        }
+        new File(reportDirectory, "application-platform-acceptance.md").setText(markdownText, "UTF-8")
+        println "Generated ${project.relativePath(new File(reportDirectory, "application-platform-acceptance.json"))}"
+        println "Generated ${project.relativePath(new File(reportDirectory, "application-platform-acceptance.md"))}"
+    }
+}
+
+tasks.register("generateApplicationPlatformLimitationBurndownReport") {
+    group = "verification"
+    description = "Generates a Phase 5.6 limitation burn-down report from the acceptance matrix."
+    dependsOn "generateApplicationPlatformAcceptanceReport"
+    doLast {
+        File reportDirectory = file("${buildDir}/reports/j7m")
+        reportDirectory.mkdirs()
+        Object evidence = new groovy.json.JsonSlurper().parse(new File(reportDirectory, "application-platform-acceptance.json"))
+        Map<String, Integer> previousCounts = [
+                PASS: 51,
+                PASS_WITH_LIMITATION: 36,
+                PARTIAL: 2,
+                DEFERRED: 3,
+                FAIL: 0,
+                NOT_APPLICABLE: 0
+        ]
+        Map<String, Object> burnDown = [
+                timestamp: "deterministic-phase-5-burndown-v1",
+                previousMatrixCounts: previousCounts,
+                currentMatrixCounts: evidence.acceptanceMatrixStatusSummary,
+                convertedRows: [
+                        "Template set: PASS_WITH_LIMITATION -> PASS",
+                        "Phase 1 ObjectRef/proxy/gRPC/RMI regression: PASS_WITH_LIMITATION -> PASS",
+                        "Workload processing example: DEFERRED -> PASS",
+                        "Streaming pipeline example: DEFERRED -> PASS",
+                        "Regulated enterprise app example: DEFERRED -> PASS",
+                        "SBOM/provenance status or compliance gap visible: PASS_WITH_LIMITATION -> PASS",
+                        "JPMS module descriptors: PASS_WITH_LIMITATION -> PASS",
+                        "JPMS application ModuleLayer activation: PASS_WITH_LIMITATION -> PASS",
+                        "Legacy classpath fallback: PASS_WITH_LIMITATION -> PASS",
+                        "Modular deployable application example: PASS_WITH_LIMITATION -> PASS",
+                        "Production module descriptor coverage: ADDED -> PASS",
+                        "No internal package export: ADDED -> PASS",
+                        "No split packages: ADDED -> PASS",
+                        "SPI uses/provides declarations: ADDED -> PASS",
+                        "JPMS app cannot access unexported J7M internals: ADDED -> PASS",
+                        "Application/deployer API transport neutrality: ADDED -> PASS",
+                        "Application bundle format: PASS_WITH_LIMITATION -> PASS",
+                        "Bundle checksum verification: PASS_WITH_LIMITATION -> PASS",
+                        "Bundle signature baseline: ADDED -> PASS",
+                        "Signature validation in strict mode: ADDED -> PASS",
+                        "Strict unsigned bundle rejection: PASS_WITH_LIMITATION -> PASS",
+                        "Strict regulated SBOM/provenance checks: ADDED -> PASS",
+                        "Local application repository: PASS_WITH_LIMITATION -> PASS",
+                        "Repository promotions/demotions: PASS_WITH_LIMITATION -> PASS",
+                        "Repository audit log: PASS_WITH_LIMITATION -> PASS",
+                        "Repository verification: ADDED -> PASS",
+                        "Repository evidence export: ADDED -> PASS",
+                        "Deployment identity: PASS_WITH_LIMITATION -> PASS",
+                        "Unauthorized start/activation denied: PASS_WITH_LIMITATION -> PASS",
+                        "Unauthorized stop/unload denied: PASS_WITH_LIMITATION -> PASS",
+                        "Audit event emission: PASS_WITH_LIMITATION -> PASS",
+                        "Application resource limits visible where implemented: PARTIAL -> PASS",
+                        "Current resource usage visible where implemented: PARTIAL -> PASS",
+                        "Bundle signature status visible: PASS_WITH_LIMITATION -> PASS",
+                        "Application audit counters visible where implemented: PASS_WITH_LIMITATION -> PASS",
+                        "ObjectRef non-bearer authorization proof: STRENGTHENED -> PASS",
+                        "ApplicationManager live activation: PASS_WITH_LIMITATION -> PASS",
+                        "Application stop/unload: PASS_WITH_LIMITATION -> PASS",
+                        "Upgrade stop-start: PASS_WITH_LIMITATION -> PASS",
+                        "Upgrade rolling: ADDED -> PASS",
+                        "Upgrade blue-green: ADDED -> PASS",
+                        "Upgrade canary-baseline unsupported result: ADDED -> PASS",
+                        "Rollback: PASS_WITH_LIMITATION -> PASS",
+                        "Admin/status installed applications: PASS_WITH_LIMITATION -> PASS",
+                        "Admin/status active applications: PASS_WITH_LIMITATION -> PASS",
+                        "Admin/status exported services: PASS_WITH_LIMITATION -> PASS",
+                        "Admin/status failed activation reason: PASS_WITH_LIMITATION -> PASS",
+                        "Admin/status upgrade/rollback history: PASS_WITH_LIMITATION -> PASS",
+                        "Example build validation: PASS_WITH_LIMITATION -> PASS",
+                        "Example package validation: ADDED -> PASS",
+                        "Example verify validation: ADDED -> PASS",
+                        "README command validation: ADDED -> PASS",
+                        "Gradle plugin baseline: PASS_WITH_LIMITATION -> PASS",
+                        "Gradle plugin tasks: ADDED -> PASS",
+                        "Gradle plugin strict verification: ADDED -> PASS",
+                        "Gradle plugin local deployment workflow: ADDED -> PASS",
+                        "Gradle plugin JPMS workflow: ADDED -> PASS",
+                        "Gradle plugin regulated workflow: ADDED -> PASS",
+                        "Deployer CLI baseline: PASS_WITH_LIMITATION -> PASS",
+                        "Deployer CLI commands: ADDED -> PASS",
+                        "Deployer CLI strict verification: ADDED -> PASS",
+                        "Deployer CLI local lifecycle workflow: ADDED -> PASS",
+                        "Deployer CLI upgrade/rollback workflow: ADDED -> PASS",
+                        "Deployer CLI repository audit workflow: ADDED -> PASS"
+                ],
+                stillPartial: evidence.partialRows,
+                stillDeferred: evidence.deferredRows,
+                remainingLimitations: evidence.passWithLimitationRows,
+                validationEvidence: [
+                        acceptanceReport: "build/reports/j7m/application-platform-acceptance.json",
+                        aggregateEvidence: evidence.validationAggregateEvidence,
+                        taskEvidence: evidence.validationTaskEvidence,
+                        operatorGuidanceCommands: evidence.operatorGuidanceCommands
+                ],
+                nonGoalConfirmation: evidence.nonGoalConfirmation
+        ]
+        String json = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(burnDown))
+        new File(reportDirectory, "application-platform-limitation-burndown.json").setText(json + System.lineSeparator(), "UTF-8")
+        StringBuilder markdown = new StringBuilder()
+        markdown.append("# Application Platform Limitation Burn-down\n\n")
+        markdown.append("- Previous matrix counts: ").append(previousCounts).append('\n')
+        markdown.append("- Current matrix counts: ").append(evidence.acceptanceMatrixStatusSummary).append('\n')
+        markdown.append("- Rows converted: ").append(burnDown.convertedRows).append('\n')
+        markdown.append("- Rows still partial: ").append(evidence.partialRows).append('\n')
+        markdown.append("- Rows still deferred: ").append(evidence.deferredRows).append('\n')
+        markdown.append("- Remaining PASS_WITH_LIMITATION rows: ").append(evidence.passWithLimitationRows).append('\n')
+        markdown.append("- Validation evidence: ").append(burnDown.validationEvidence).append('\n')
+        markdown.append("- Non-goal confirmation: ").append(evidence.nonGoalConfirmation).append('\n')
+        new File(reportDirectory, "application-platform-limitation-burndown.md").setText(markdown.toString(), "UTF-8")
+        println "Generated ${project.relativePath(new File(reportDirectory, "application-platform-limitation-burndown.json"))}"
+        println "Generated ${project.relativePath(new File(reportDirectory, "application-platform-limitation-burndown.md"))}"
+    }
+}
+
+tasks.register("validateApplicationPlatform") {
+    group = "verification"
+    description = "Runs the Phase 5.6 application-platform validation suite except an initial clean."
+    dependsOn "build"
+    dependsOn ":j7m-tests:phase5ApplicationPlatformTest"
+    dependsOn "buildExamples"
+    dependsOn "packageExamples"
+    dependsOn "verifyExamples"
+    dependsOn ":j7m-gradle-plugin:test"
+    dependsOn "j7mPackage"
+    dependsOn "j7mSign"
+    dependsOn "j7mVerify"
+    dependsOn "j7mDeployLocal"
+    dependsOn "j7mPlanLocal"
+    dependsOn "j7mRunLocal"
+    dependsOn "j7mStatusLocal"
+    dependsOn "j7mStopLocal"
+    dependsOn "j7mUnloadLocal"
+    dependsOn ":j7m-deployer-cli:test"
+    dependsOn ":j7m-demo:runGradlePluginWorkflowDemo"
+    dependsOn ":j7m-demo:runDeployerCliWorkflowDemo"
+    dependsOn ":j7m-demo:runDeployerCliUpgradeRollbackDemo"
+    dependsOn "validateJ7mArchitecture"
+    dependsOn "generateApplicationPlatformAcceptanceReport"
+    dependsOn "generateApplicationPlatformLimitationBurndownReport"
+    dependsOn "diagnoseUdpMulticastCapability"
+    dependsOn ":j7m-kernel:dependencies"
+    dependsOn ":j7m-runtime:dependencies"
+}

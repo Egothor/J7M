@@ -1,0 +1,1 @@
+annotation-first simple greeting: org.j7m.examples:annotation-simple:1.0.0:eu:hello developer

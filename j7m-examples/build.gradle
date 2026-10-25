@@ -1,0 +1,21 @@
+// Copyright (c) 2026, Leo Galambos and the Egothor team
+// https://www.egothor.org
+// SPDX-License-Identifier: BSD-4-Clause
+// Licensed under the BSD 4-Clause License; see LICENSE for the full terms.
+// This product includes software developed by Leo Galambos and the Egothor
+// team (https://www.egothor.org).
+
+dependencies {
+    api project(":j7m-api")
+    testImplementation project(":j7m-application-platform")
+    testImplementation project(":j7m-annotation-processor")
+    testImplementation project(":j7m-kernel")
+    testImplementation libs.junit.jupiter
+    testRuntimeOnly libs.junit.platform.launcher
+}
+
+// Process only the dedicated reference source family inside its executable test, not legacy descriptors.
+tasks.named('test') {
+    doFirst { systemProperty 'j7m.examples.test.classpath', sourceSets.test.runtimeClasspath.asPath }
+    systemProperty 'j7m.examples.reference.source', file('src/main/java/org/j7m/middleware/examples/annotation/ManagedAnnotationUsage.java').absolutePath
+}

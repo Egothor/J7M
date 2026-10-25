@@ -1,0 +1,3 @@
+phase5.5 workload checkpoint: page-5
+phase5.5 workload stale fence accepted: false
+phase5.5 workload cancelled state: CANCELLED

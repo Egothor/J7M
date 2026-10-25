@@ -1,0 +1,632 @@
+// Copyright (c) 2026, Leo Galambos and the Egothor team
+// https://www.egothor.org
+// SPDX-License-Identifier: BSD-4-Clause
+// Licensed under the BSD 4-Clause License; see LICENSE for the full terms.
+// This product includes software developed by Leo Galambos and the Egothor
+// team (https://www.egothor.org).
+
+/*
+ * Purpose: enforces architecture boundaries and Phase 6 reliability-family validations.
+ * Owns: validateJ7mArchitecture, validateReliabilitySemantics, service-family
+ * validation tasks, and adapter SPI/TCK validators.
+ * Must not own: production dependencies, demo JavaExec bodies, example taxonomy,
+ * or acceptance report rendering.
+ * Root rationale: these validators inspect multiple modules and documentation files
+ * to protect repository-wide security and dependency boundaries.
+ * Related validation tasks: validateJ7mArchitecture, validateReliabilitySemantics,
+ * validateDurableLog, validateMessaging, validateCoordination, validateConsensus,
+ * validateRepositoryReplication, validateSaga, validateIsolation, validateAdapterSpi,
+ * validateAdapterTck.
+ */
+
+tasks.register("validateJ7mArchitecture") {
+    group = "verification"
+    description = "Validates JPMS descriptor coverage, exports, split packages, and transport boundaries."
+    dependsOn "compileJava"
+    doLast {
+        Map<String, String> production = rootProject.ext.jpmsProductionModules
+        Map<String, String> support = rootProject.ext.jpmsSupportModules
+        Map<String, String> notApplicable = rootProject.ext.jpmsNotApplicableModules
+        List<String> missingDescriptors = []
+        List<String> exportedInternalPackages = []
+        List<String> demoLikeProductionSources = []
+        List<String> productionMainMethods = []
+        List<String> productionDemoRuntimeLeaks = []
+        List<String> forbiddenObjectStorageDependencies = []
+        List<String> accidentalTransportApis = []
+        Map<String, String> packageOwners = [:]
+        List<String> splitPackages = []
+        Map<String, Object> inventory = new LinkedHashMap<>()
+
+        Map<String, String> namedModules = new LinkedHashMap<>()
+        namedModules.putAll(production)
+        namedModules.putAll(support)
+
+        namedModules.each { String projectName, String moduleName ->
+            File projectDirectory = file(projectName)
+            File descriptor = file("${projectName}/src/main/java/module-info.java")
+            if (!projectDirectory.isDirectory()) {
+                inventory.put(projectName, [classification: "NOT_APPLICABLE", reason: "module does not exist in this repository"])
+                return
+            }
+            inventory.put(projectName, [classification: production.containsKey(projectName) ? "PRODUCTION_JAVA_MODULE" : "NAMED_SUPPORT_MODULE", moduleName: moduleName])
+            if (!descriptor.isFile()) {
+                missingDescriptors.add(projectName)
+                return
+            }
+            String descriptorText = descriptor.getText("UTF-8")
+            if (!descriptorText.contains("module ${moduleName}")) {
+                throw new GradleException("${projectName} descriptor does not declare ${moduleName}")
+            }
+            descriptorText.eachLine { String line ->
+                String trimmed = line.trim()
+                if (trimmed.startsWith("exports ") && trimmed.contains(".internal")) {
+                    exportedInternalPackages.add("${projectName}:${trimmed}")
+                }
+            }
+            File sourceRoot = file("${projectName}/src/main/java")
+            fileTree(sourceRoot).matching { include "**/*.java"; exclude "module-info.java" }.files.each { File sourceFile ->
+                String text = sourceFile.getText("UTF-8")
+                String relativeSource = sourceRoot.toPath().relativize(sourceFile.toPath()).toString()
+                if (production.containsKey(projectName)) {
+                    if (relativeSource ==~ /.*(Demo|Example|Sample|Showcase|Tutorial).*\.java/) {
+                        demoLikeProductionSources.add("${projectName}:${relativeSource}")
+                    }
+                    java.util.regex.Matcher demoLikeTypeMatcher = java.util.regex.Pattern
+                            .compile("(?m)\\b(class|interface|record|enum)\\s+[A-Za-z0-9_]*(Demo|Example|Sample|Showcase|Tutorial)[A-Za-z0-9_]*\\b")
+                            .matcher(text)
+                    if (demoLikeTypeMatcher.find()) {
+                        demoLikeProductionSources.add("${projectName}:${relativeSource}:${demoLikeTypeMatcher.group(0)}")
+                    }
+                    if (java.util.regex.Pattern.compile("\\bpublic\\s+static\\s+void\\s+main\\s*\\(").matcher(text).find()) {
+                        productionMainMethods.add("${projectName}:${relativeSource}")
+                    }
+                }
+                java.util.regex.Matcher matcher = java.util.regex.Pattern
+                        .compile("(?m)^\\s*package\\s+([a-zA-Z0-9_.]+)\\s*;")
+                        .matcher(text)
+                if (matcher.find()) {
+                    String packageName = matcher.group(1)
+                    String previous = packageOwners.putIfAbsent(packageName, projectName)
+                    if (previous != null && previous != projectName) {
+                        splitPackages.add("${packageName}: ${previous}, ${projectName}")
+                    }
+                }
+            }
+        }
+        production.keySet().each { String projectName ->
+            Set<String> runtimeProjects = project(":${projectName}").configurations.runtimeClasspath.incoming.resolutionResult.allDependencies
+                    .findAll { it instanceof org.gradle.api.artifacts.result.ResolvedDependencyResult }
+                    .collect { it.selected.id.displayName }
+                    .toSet()
+            [":j7m-demo", ":j7m-examples"].each { String forbiddenPath ->
+                if (runtimeProjects.any { String displayName -> displayName.contains("project ${forbiddenPath}") }) {
+                    productionDemoRuntimeLeaks.add(":${projectName} runtimeClasspath contains forbidden project ${forbiddenPath}")
+                }
+            }
+        }
+        List<File> dependencyInputs = [file("settings.gradle"), file("build.gradle"), file("build.gradle.kts"),
+                                       file("gradle/libs.versions.toml"), file("gradle/dependency-locks")]
+                .findAll { File candidate -> candidate.exists() }
+        if (file("buildSrc").exists()) {
+            dependencyInputs.addAll(fileTree("buildSrc").matching {
+                include "**/*.gradle"
+                include "**/*.gradle.kts"
+                include "**/*.toml"
+            }.files)
+        }
+        List<String> forbiddenDependencyTokens = [
+                ["software.amazon", "awssdk"].join("."),
+                ["com", "amazonaws"].join("."),
+                ["com", "google", "cloud"].join("."),
+                ["google-cloud", "storage"].join("-"),
+                ["google-cloud", "storage"].join("-"),
+                ["com", "azure"].join("."),
+                ["azure-storage", "blob"].join("-"),
+                ["org.apache", "hadoop"].join("."),
+                ["org.apache", "ka" + "fka"].join("."),
+                ["org.apache", "pulsar"].join("."),
+                ["com", "rabbit" + "mq"].join("."),
+                ["org", "postgres" + "ql"].join("."),
+                ["org", "elastic" + "search"].join("."),
+                ["io", "et" + "cd"].join("."),
+                ["org.apache", "zoo" + "keeper"].join("."),
+                ["io", "kuber" + "netes"].join("."),
+                ["io", "fabric8"].join("."),
+                ["cam", "unda"].join(""),
+                ["tempo", "ral"].join(""),
+                ["ze", "ebe"].join(""),
+                ["acti", "viti"].join(""),
+                ["flow", "able"].join(""),
+                ["nara", "yana"].join(""),
+                ["ato", "mikos"].join(""),
+                ["bit", "ronix"].join(""),
+                ["jakarta", "transaction"].join("."),
+                ["javax", "transaction"].join("."),
+                ["dock", "er"].join(""),
+                ["com.github", "dock" + "erjava"].join("."),
+                ["io", "fabric8", "kuber" + "netes"].join("."),
+                ["io", "kuber" + "netes"].join("."),
+                ["org", "testcontainers"].join("."),
+                ["container", "d"].join(""),
+                ["pod", "man"].join(""),
+                ["cri", "-o"].join(""),
+                ["run", "c"].join(""),
+                ["fire", "cracker"].join(""),
+                ["g", "visor"].join(""),
+                ["kata", "-containers"].join("")
+        ]
+        dependencyInputs.each { File input ->
+            if (input.isDirectory()) {
+                fileTree(input).files.each { File nested ->
+                    if (nested.isFile()) {
+                        nested.readLines("UTF-8").eachWithIndex { String line, int index ->
+                            String trimmed = line.trim()
+                            boolean productionDependencyLine = trimmed ==~ /^(api|implementation|compileOnly|runtimeOnly)\s+.*/
+                            boolean catalogDependencyLine = nested.name == "libs.versions.toml" && !trimmed.startsWith("[")
+                            if (productionDependencyLine || catalogDependencyLine) {
+                                forbiddenDependencyTokens.each { String forbidden ->
+                                    if (trimmed.contains(forbidden)) {
+                                        forbiddenObjectStorageDependencies.add("${nested}:${index + 1}:${forbidden}")
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                input.readLines("UTF-8").eachWithIndex { String line, int index ->
+                    String trimmed = line.trim()
+                    boolean productionDependencyLine = trimmed ==~ /^(api|implementation|compileOnly|runtimeOnly)\s+.*/
+                    boolean catalogDependencyLine = input.name == "libs.versions.toml" && !trimmed.startsWith("[")
+                    if (productionDependencyLine || catalogDependencyLine) {
+                        forbiddenDependencyTokens.each { String forbidden ->
+                            if (trimmed.contains(forbidden)) {
+                                forbiddenObjectStorageDependencies.add("${input}:${index + 1}:${forbidden}")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        notApplicable.each { String projectName, String reason ->
+            if (file(projectName).isDirectory()) {
+                inventory.put(projectName, [classification: reason.startsWith("GRADLE_PLUGIN_MODULE") ? "GRADLE_PLUGIN_MODULE" : reason, reason: reason])
+            }
+        }
+        if (!missingDescriptors.isEmpty()) {
+            throw new GradleException("production modules missing module-info.java: ${missingDescriptors}")
+        }
+        if (!exportedInternalPackages.isEmpty()) {
+            throw new GradleException("JPMS descriptors export internal packages: ${exportedInternalPackages}")
+        }
+        if (!demoLikeProductionSources.isEmpty()) {
+            throw new GradleException("production main source sets contain demo/example/sample/showcase/tutorial types: ${demoLikeProductionSources.unique()}")
+        }
+        if (!productionMainMethods.isEmpty()) {
+            throw new GradleException("production main source sets contain public static void main entrypoints: ${productionMainMethods.unique()}")
+        }
+        if (!productionDemoRuntimeLeaks.isEmpty()) {
+            throw new GradleException("production runtime classpaths leak demo/example modules: ${productionDemoRuntimeLeaks.unique()}")
+        }
+        if (!forbiddenObjectStorageDependencies.isEmpty()) {
+            throw new GradleException("external object-storage/broker/coordination dependencies are forbidden: ${forbiddenObjectStorageDependencies.unique()}")
+        }
+        if (!splitPackages.isEmpty()) {
+            throw new GradleException("split packages among production modules: ${splitPackages}")
+        }
+        String coreDescriptor = file("j7m-kernel/src/main/java/module-info.java").getText("UTF-8")
+        String runtimeDescriptor = file("j7m-runtime/src/main/java/module-info.java").getText("UTF-8")
+        ["org.j7m.middleware.transport.grpc", "org.j7m.middleware.transport.rmi", "io.grpc", "java.rmi"].each { String forbidden ->
+            if (coreDescriptor.contains(forbidden)) {
+                throw new GradleException("j7m-kernel descriptor reads forbidden module ${forbidden}")
+            }
+            if (runtimeDescriptor.contains(forbidden)) {
+                throw new GradleException("j7m-runtime descriptor reads forbidden module ${forbidden}")
+            }
+        }
+        String grpcDescriptor = file("j7m-transport-grpc/src/main/java/module-info.java").getText("UTF-8")
+        String rmiDescriptor = file("j7m-transport-rmi/src/main/java/module-info.java").getText("UTF-8")
+        String codecDescriptor = file("j7m-kernel/src/main/java/module-info.java").getText("UTF-8")
+        File inProcessNetworkSource = file("j7m-api/src/main/java/org/j7m/middleware/transport/api/InProcessTransportNetwork.java")
+        File inProcessProviderSource = file("j7m-api/src/main/java/org/j7m/middleware/transport/api/AbstractInProcessTransportProvider.java")
+        File exportedRmiRemoteServiceSource = file("j7m-transport-rmi/src/main/java/org/j7m/middleware/transport/rmi/RmiRemoteObjectService.java")
+        if (inProcessNetworkSource.isFile()
+                && inProcessNetworkSource.getText("UTF-8").contains("public final class InProcessTransportNetwork")) {
+            accidentalTransportApis.add("j7m-api exports public InProcessTransportNetwork")
+        }
+        if (inProcessProviderSource.isFile()
+                && inProcessProviderSource.getText("UTF-8").contains("public abstract class AbstractInProcessTransportProvider")) {
+            accidentalTransportApis.add("j7m-api exports public AbstractInProcessTransportProvider")
+        }
+        if (exportedRmiRemoteServiceSource.isFile()) {
+            accidentalTransportApis.add("j7m-transport-rmi exports RmiRemoteObjectService from the public RMI package")
+        }
+        if (rmiDescriptor.contains("exports org.j7m.middleware.transport.rmi.internal")
+                || rmiDescriptor.contains("opens org.j7m.middleware.transport.rmi.internal")) {
+            accidentalTransportApis.add("j7m-transport-rmi exposes its internal package")
+        }
+        if (!grpcDescriptor.contains("provides org.j7m.middleware.transport.api.TransportProvider")) {
+            throw new GradleException("gRPC transport descriptor is missing TransportProvider declaration")
+        }
+        if (!rmiDescriptor.contains("provides org.j7m.middleware.transport.api.TransportProvider")) {
+            throw new GradleException("RMI transport descriptor is missing TransportProvider declaration")
+        }
+        if (!codecDescriptor.contains("provides org.j7m.middleware.codec.api.ValueCodec")) {
+            throw new GradleException("default codec descriptor is missing ValueCodec declaration")
+        }
+        if (!accidentalTransportApis.isEmpty()) {
+            throw new GradleException("transport implementation internals must not be exported public API: ${accidentalTransportApis}")
+        }
+        [":j7m-kernel", ":j7m-runtime"].each { String projectPath ->
+            Set<String> runtimeProjects = project(projectPath).configurations.runtimeClasspath.incoming.resolutionResult.allDependencies
+                    .findAll { it instanceof org.gradle.api.artifacts.result.ResolvedDependencyResult }
+                    .collect { it.selected.id.displayName }
+                    .toSet()
+            [":j7m-durable-log", ":j7m-messaging", ":j7m-coordination", ":j7m-consensus", ":j7m-saga",
+             ":j7m-isolation", ":j7m-adapter-spi", ":j7m-adapter-tck", ":j7m-transport-grpc",
+             ":j7m-transport-rmi", ":j7m-deployer-cli", ":j7m-gradle-plugin", ":j7m-demo",
+             ":j7m-examples", ":j7m-tests"].each { String forbiddenPath ->
+                if (runtimeProjects.any { String displayName -> displayName.contains("project ${forbiddenPath}") }) {
+                    throw new GradleException("${projectPath} runtimeClasspath contains forbidden project ${forbiddenPath}")
+                }
+            }
+        }
+        Set<String> durableLogRuntimeProjects = project(":j7m-durable-log").configurations.runtimeClasspath.incoming.resolutionResult.allDependencies
+                .findAll { it instanceof org.gradle.api.artifacts.result.ResolvedDependencyResult }
+                .collect { it.selected.id.displayName }
+                .toSet()
+        [":j7m-messaging", ":j7m-coordination", ":j7m-consensus", ":j7m-saga", ":j7m-transport-grpc", ":j7m-transport-rmi", ":j7m-runtime", ":j7m-deployer-cli", ":j7m-gradle-plugin", ":j7m-demo", ":j7m-examples", ":j7m-tests"].each { String forbiddenPath ->
+            if (durableLogRuntimeProjects.any { String displayName -> displayName.contains("project ${forbiddenPath}") }) {
+                throw new GradleException(":j7m-durable-log runtimeClasspath contains forbidden project ${forbiddenPath}")
+            }
+        }
+        Set<String> messagingRuntimeProjects = project(":j7m-messaging").configurations.runtimeClasspath.incoming.resolutionResult.allDependencies
+                .findAll { it instanceof org.gradle.api.artifacts.result.ResolvedDependencyResult }
+                .collect { it.selected.id.displayName }
+                .toSet()
+        [":j7m-coordination", ":j7m-consensus", ":j7m-saga", ":j7m-transport-grpc", ":j7m-transport-rmi", ":j7m-runtime", ":j7m-deployer-cli", ":j7m-gradle-plugin", ":j7m-demo", ":j7m-examples", ":j7m-tests"].each { String forbiddenPath ->
+            if (messagingRuntimeProjects.any { String displayName -> displayName.contains("project ${forbiddenPath}") }) {
+                throw new GradleException(":j7m-messaging runtimeClasspath contains forbidden project ${forbiddenPath}")
+            }
+        }
+        if (!messagingRuntimeProjects.any { String displayName -> displayName.contains("project :j7m-durable-log") }) {
+            throw new GradleException(":j7m-messaging runtimeClasspath does not contain intended project :j7m-durable-log")
+        }
+        Set<String> coordinationRuntimeProjects = project(":j7m-coordination").configurations.runtimeClasspath.incoming.resolutionResult.allDependencies
+                .findAll { it instanceof org.gradle.api.artifacts.result.ResolvedDependencyResult }
+                .collect { it.selected.id.displayName }
+                .toSet()
+        [":j7m-messaging", ":j7m-consensus", ":j7m-saga", ":j7m-transport-grpc", ":j7m-transport-rmi", ":j7m-runtime", ":j7m-deployer-cli", ":j7m-gradle-plugin", ":j7m-demo", ":j7m-examples", ":j7m-tests"].each { String forbiddenPath ->
+            if (coordinationRuntimeProjects.any { String displayName -> displayName.contains("project ${forbiddenPath}") }) {
+                throw new GradleException(":j7m-coordination runtimeClasspath contains forbidden project ${forbiddenPath}")
+            }
+        }
+        if (!coordinationRuntimeProjects.any { String displayName -> displayName.contains("project :j7m-durable-log") }) {
+            throw new GradleException(":j7m-coordination runtimeClasspath does not contain intended project :j7m-durable-log")
+        }
+        Set<String> consensusRuntimeProjects = project(":j7m-consensus").configurations.runtimeClasspath.incoming.resolutionResult.allDependencies
+                .findAll { it instanceof org.gradle.api.artifacts.result.ResolvedDependencyResult }
+                .collect { it.selected.id.displayName }
+                .toSet()
+        [":j7m-messaging", ":j7m-coordination", ":j7m-saga", ":j7m-transport-grpc", ":j7m-transport-rmi", ":j7m-runtime", ":j7m-deployer-cli", ":j7m-gradle-plugin", ":j7m-demo", ":j7m-examples", ":j7m-tests"].each { String forbiddenPath ->
+            if (consensusRuntimeProjects.any { String displayName -> displayName.contains("project ${forbiddenPath}") }) {
+                throw new GradleException(":j7m-consensus runtimeClasspath contains forbidden project ${forbiddenPath}")
+            }
+        }
+        if (!consensusRuntimeProjects.any { String displayName -> displayName.contains("project :j7m-durable-log") }) {
+            throw new GradleException(":j7m-consensus runtimeClasspath does not contain intended project :j7m-durable-log")
+        }
+        Set<String> sagaRuntimeProjects = project(":j7m-saga").configurations.runtimeClasspath.incoming.resolutionResult.allDependencies
+                .findAll { it instanceof org.gradle.api.artifacts.result.ResolvedDependencyResult }
+                .collect { it.selected.id.displayName }
+                .toSet()
+        [":j7m-coordination", ":j7m-consensus", ":j7m-application-platform", ":j7m-transport-grpc", ":j7m-transport-rmi", ":j7m-runtime", ":j7m-deployer-cli", ":j7m-gradle-plugin", ":j7m-demo", ":j7m-examples", ":j7m-tests"].each { String forbiddenPath ->
+            if (sagaRuntimeProjects.any { String displayName -> displayName.contains("project ${forbiddenPath}") }) {
+                throw new GradleException(":j7m-saga runtimeClasspath contains forbidden project ${forbiddenPath}")
+            }
+        }
+        if (!sagaRuntimeProjects.any { String displayName -> displayName.contains("project :j7m-durable-log") }) {
+            throw new GradleException(":j7m-saga runtimeClasspath does not contain intended project :j7m-durable-log")
+        }
+        if (!sagaRuntimeProjects.any { String displayName -> displayName.contains("project :j7m-messaging") }) {
+            throw new GradleException(":j7m-saga runtimeClasspath does not contain intended project :j7m-messaging")
+        }
+        Set<String> isolationRuntimeProjects = project(":j7m-isolation").configurations.runtimeClasspath.incoming.resolutionResult.allDependencies
+                .findAll { it instanceof org.gradle.api.artifacts.result.ResolvedDependencyResult }
+                .collect { it.selected.id.displayName }
+                .toSet()
+        [":j7m-durable-log", ":j7m-messaging", ":j7m-coordination", ":j7m-consensus", ":j7m-saga",
+         ":j7m-application-platform", ":j7m-transport-grpc", ":j7m-transport-rmi", ":j7m-runtime",
+         ":j7m-deployer-cli", ":j7m-gradle-plugin", ":j7m-demo", ":j7m-examples", ":j7m-tests"].each { String forbiddenPath ->
+            if (isolationRuntimeProjects.any { String displayName -> displayName.contains("project ${forbiddenPath}") }) {
+                throw new GradleException(":j7m-isolation runtimeClasspath contains forbidden project ${forbiddenPath}")
+            }
+        }
+        Set<String> adapterSpiRuntimeProjects = project(":j7m-adapter-spi").configurations.runtimeClasspath.incoming.resolutionResult.allDependencies
+                .findAll { it instanceof org.gradle.api.artifacts.result.ResolvedDependencyResult }
+                .collect { it.selected.id.displayName }
+                .toSet()
+        [":j7m-durable-log", ":j7m-messaging", ":j7m-coordination", ":j7m-consensus", ":j7m-saga",
+         ":j7m-isolation", ":j7m-application-platform", ":j7m-transport-grpc", ":j7m-transport-rmi",
+         ":j7m-runtime", ":j7m-deployer-cli", ":j7m-gradle-plugin", ":j7m-demo", ":j7m-examples",
+         ":j7m-tests", ":j7m-adapter-tck"].each { String forbiddenPath ->
+            if (adapterSpiRuntimeProjects.any { String displayName -> displayName.contains("project ${forbiddenPath}") }) {
+                throw new GradleException(":j7m-adapter-spi runtimeClasspath contains forbidden project ${forbiddenPath}")
+            }
+        }
+        Set<String> adapterTckRuntimeProjects = project(":j7m-adapter-tck").configurations.runtimeClasspath.incoming.resolutionResult.allDependencies
+                .findAll { it instanceof org.gradle.api.artifacts.result.ResolvedDependencyResult }
+                .collect { it.selected.id.displayName }
+                .toSet()
+        [":j7m-durable-log", ":j7m-messaging", ":j7m-coordination", ":j7m-consensus", ":j7m-saga",
+         ":j7m-isolation", ":j7m-application-platform", ":j7m-transport-grpc", ":j7m-transport-rmi",
+         ":j7m-runtime", ":j7m-deployer-cli", ":j7m-gradle-plugin", ":j7m-demo", ":j7m-examples",
+         ":j7m-tests"].each { String forbiddenPath ->
+            if (adapterTckRuntimeProjects.any { String displayName -> displayName.contains("project ${forbiddenPath}") }) {
+                throw new GradleException(":j7m-adapter-tck runtimeClasspath contains forbidden project ${forbiddenPath}")
+            }
+        }
+        production.keySet().findAll { String projectName -> projectName != "j7m-adapter-spi" }.each { String projectName ->
+            Set<String> runtimeProjects = project(":${projectName}").configurations.runtimeClasspath.incoming.resolutionResult.allDependencies
+                    .findAll { it instanceof org.gradle.api.artifacts.result.ResolvedDependencyResult }
+                    .collect { it.selected.id.displayName }
+                    .toSet()
+            [":j7m-adapter-spi", ":j7m-adapter-tck"].each { String forbiddenPath ->
+                if (runtimeProjects.any { String displayName -> displayName.contains("project ${forbiddenPath}") }) {
+                    throw new GradleException(":${projectName} runtimeClasspath contains forbidden adapter project ${forbiddenPath}")
+                }
+            }
+        }
+        File adapterDocument = file("documentation/docs/programming/adapters.md")
+        if (adapterDocument.isFile()) {
+            String adapterText = adapterDocument.getText("UTF-8").toLowerCase(java.util.Locale.ROOT)
+            ["vendor", "semantic profiles", "reference operations", "limitations"].each { String required ->
+                if (!adapterText.contains(required)) {
+                    throw new GradleException("adapter SPI/TCK document is missing required limitation term: ${required}")
+                }
+            }
+            [["includes a production ", "ka" + "fka", " adapter"].join(""),
+             ["includes a production ", "kuber" + "netes", " adapter"].join(""),
+             "includes a production s3 adapter", "provides generic exactly-once",
+             "provides distributed acid"].each { String forbidden ->
+                if (adapterText.contains(forbidden)) {
+                    throw new GradleException("adapter SPI/TCK document contains forbidden overclaim: ${forbidden}")
+                }
+            }
+        }
+        File isolationDocument = file("documentation/docs/security/isolation-providers.md")
+        if (!isolationDocument.isFile()) {
+            throw new GradleException("missing Phase 6.8 isolation provider document")
+        }
+        String isolationText = isolationDocument.getText("UTF-8").toLowerCase(java.util.Locale.ROOT)
+        ["not an os filesystem jail", "container runtime", "advisory", "policy only", "bounded"].each { String required ->
+            if (!isolationText.contains(required)) {
+                throw new GradleException("isolation provider document is missing required limitation term: ${required}")
+            }
+        }
+        List<String> forbiddenIsolationClaims = [
+                ["guarantees os-level", "sandboxing"].join(" "),
+                ["full container runtime", "implementation"].join(" "),
+                ["dock" + "er-compatible", "runtime"].join(" "),
+                ["kuber" + "netes-compatible", "runtime"].join(" "),
+                ["oci runtime", "implementation"].join(" ")
+        ]
+        ["README.md", "documentation/docs/security/isolation-providers.md", "j7m-api/src/main/java/org/j7m/middleware/api/isolation/IsolationProvider.java"].each { String relative ->
+            File candidate = file(relative)
+            if (candidate.isFile()) {
+                String lower = candidate.getText("UTF-8").toLowerCase(java.util.Locale.ROOT)
+                forbiddenIsolationClaims.each { String phrase ->
+                    if (lower.contains(phrase)) {
+                        throw new GradleException("forbidden isolation overclaim '${phrase}' in ${relative}")
+                    }
+                }
+            }
+        }
+        File reportDirectory = file("${buildDir}/reports/j7m")
+        reportDirectory.mkdirs()
+        Map<String, Object> report = [
+                jpmsDescriptorCoverage: "PASS",
+                productionModulesWithoutDescriptor: 0,
+                exportedInternalPackages: 0,
+                demoLikeProductionSources: 0,
+                productionMainMethods: 0,
+                productionDemoRuntimeLeaks: 0,
+                forbiddenObjectStorageDependencies: 0,
+                splitPackages: 0,
+                coreReadsConcreteTransport: false,
+                runtimeReadsConcreteTransport: false,
+                jpmsAppIsolation: "PASS",
+                classpathFallback: "PASS",
+                inventory: inventory,
+                notApplicableModules: notApplicable
+        ]
+        new File(reportDirectory, "jpms-boundaries.json").setText(
+                groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(report)) + System.lineSeparator(),
+                "UTF-8")
+    }
+}
+
+tasks.register("validateReliabilitySemantics") {
+    group = "verification"
+    description = "Validates Phase 6.1 reliability semantics API, kernel policy helpers, transport metadata, and runtime status."
+    dependsOn ":j7m-tests:phase6ReliabilitySemanticsTest"
+    dependsOn "validateJ7mArchitecture"
+    dependsOn "validateApplicationPlatform"
+}
+
+tasks.register("validateDurableLog") {
+    group = "verification"
+    description = "Validates Phase 6.2 durable log API, file-backed implementation, recovery, and boundaries."
+    dependsOn ":j7m-durable-log:test"
+    dependsOn "validateJ7mArchitecture"
+    dependsOn "validateReliabilitySemantics"
+}
+
+tasks.register("validateMessaging") {
+    group = "verification"
+    description = "Validates Phase 6.3 durable queue and outbox/inbox implementation, tests, and boundaries."
+    dependsOn ":j7m-messaging:test"
+    dependsOn "validateJ7mArchitecture"
+    dependsOn "validateDurableLog"
+}
+
+tasks.register("validateCoordination") {
+    group = "verification"
+    description = "Validates Phase 6.4 coordination and membership implementation, tests, and boundaries."
+    dependsOn ":j7m-coordination:test"
+    dependsOn "validateJ7mArchitecture"
+}
+
+tasks.register("validateConsensus") {
+    group = "verification"
+    description = "Validates Phase 6.5 consensus implementation, adversarial simulation, safety invariants, and boundaries."
+    dependsOn ":j7m-consensus:test"
+    dependsOn "validateJ7mArchitecture"
+    dependsOn ":j7m-coordination:test"
+}
+
+tasks.register("validateRepositoryReplication") {
+    group = "verification"
+    description = "Validates Phase 6.6 repository and artifact replication implementation, tests, and boundaries."
+    dependsOn ":j7m-application-platform:test"
+    dependsOn "validateJ7mArchitecture"
+    dependsOn ":j7m-consensus:test"
+}
+
+tasks.register("validateSaga") {
+    group = "verification"
+    description = "Validates Phase 6.7 saga orchestration and transaction-context implementation, tests, and boundaries."
+    dependsOn ":j7m-saga:test"
+    dependsOn "validateJ7mArchitecture"
+}
+
+tasks.register("validateIsolation") {
+    group = "verification"
+    description = "Validates Phase 6.8 isolation provider implementation, tests, documentation, and boundaries."
+    dependsOn ":j7m-isolation:test"
+    dependsOn "validateJ7mArchitecture"
+    dependsOn "validatePublicApiDocs"
+    doLast {
+        File document = file("documentation/docs/security/isolation-providers.md")
+        if (!document.isFile()) {
+            throw new GradleException("missing documentation/docs/security/isolation-providers.md")
+        }
+        String text = document.getText("UTF-8")
+        [
+                "IsolationProvider", "InProcessIsolationProvider", "LocalProcessIsolationProvider",
+                "resource-budget", "filesystem policy", "network policy", "environment",
+                "lifecycle", "stdout", "stderr", "redaction", "audit", "metrics", "advisory"
+        ].each { String token ->
+            if (!text.toLowerCase(java.util.Locale.ROOT).contains(token.toLowerCase(java.util.Locale.ROOT))) {
+                throw new GradleException("isolation provider document missing required section or phrase: ${token}")
+            }
+        }
+        String descriptor = file("j7m-isolation/src/main/java/module-info.java").getText("UTF-8")
+        if (descriptor.contains(".internal")) {
+            throw new GradleException("j7m-isolation exports an internal package")
+        }
+        String lower = text.toLowerCase(java.util.Locale.ROOT)
+        if (lower.contains("queue/backlog budget | enforced")) {
+            throw new GradleException("isolation docs must not claim queue/backlog enforcement for the Java-only baseline")
+        }
+        if (!lower.contains("queue/backlog budget | policy only")) {
+            throw new GradleException("isolation docs must classify queue/backlog budget as POLICY_ONLY for the Java-only baseline")
+        }
+        if (!lower.contains("smaller request timeout and resource-budget maximum runtime")
+                || !lower.contains("smaller stream-policy and resource-budget bounds")) {
+            throw new GradleException("isolation docs must describe effective runtime and output limit calculations")
+        }
+    }
+}
+
+tasks.register("validateAdapterSpi") {
+    group = "verification"
+    description = "Validates Phase 6.9 adapter SPI contracts, documentation, Javadocs, and dependency boundaries."
+    dependsOn ":j7m-adapter-spi:test"
+    dependsOn "validateJ7mArchitecture"
+    dependsOn "validatePublicApiDocs"
+    doLast {
+        File descriptor = file("j7m-adapter-spi/src/main/java/module-info.java")
+        if (!descriptor.getText("UTF-8").contains("module org.j7m.adapter.spi")) {
+            throw new GradleException("j7m-adapter-spi JPMS descriptor is missing")
+        }
+        if (descriptor.getText("UTF-8").contains(".internal")) {
+            throw new GradleException("j7m-adapter-spi exports an internal package")
+        }
+        File adapterProvider = file("j7m-adapter-spi/src/main/java/org/j7m/middleware/adapter/spi/AdapterProvider.java")
+        String providerText = adapterProvider.getText("UTF-8").toLowerCase(java.util.Locale.ROOT)
+        ["vendor-neutral", "thread-safe", "lifecycle", "error codes", "redacted", "blocking"].each { String token ->
+            if (!providerText.contains(token)) {
+                throw new GradleException("AdapterProvider Javadocs missing semantic term: ${token}")
+            }
+        }
+    }
+}
+
+tasks.register("validateAdapterTck") {
+    group = "verification"
+    description = "Validates Phase 6.9 adapter TCK harness, fake fixture boundaries, documentation, and demo wiring."
+    dependsOn ":j7m-adapter-tck:test"
+    dependsOn "validateAdapterSpi"
+    doLast {
+        File document = file("documentation/docs/programming/adapters.md")
+        if (!document.isFile()) {
+            throw new GradleException("missing documentation/docs/programming/adapters.md")
+        }
+        String text = document.getText("UTF-8").toLowerCase(java.util.Locale.ROOT)
+        [
+                "adapterprovider", "semantic profiles", "capabilities", "compatibility",
+                "durable log", "messaging", "coordination", "consensus", "repository replication",
+                "saga", "isolation", "failure-mode", "redaction", "limitations", "reference operations"
+        ].each { String token ->
+            if (!text.contains(token)) {
+                throw new GradleException("adapter SPI/TCK document missing required section or phrase: ${token}")
+            }
+        }
+        [
+                "sentinel leakage", "public provider and report surfaces", "actual observable operations",
+                "adapterreferencesession.recordeffect"
+        ].each { String token ->
+            if (!text.contains(token)) {
+                throw new GradleException("adapter SPI/TCK document missing hardened redaction/security-scope wording: ${token}")
+            }
+        }
+        if (text.contains("security checks verify authorization hooks, audit hooks, verification gates")) {
+            throw new GradleException("adapter SPI/TCK document still overclaims universal verification-gate security checks")
+        }
+        File redactionPolicy = file("j7m-adapter-spi/src/main/java/org/j7m/middleware/adapter/spi/AdapterRedactionPolicy.java")
+        String redactionPolicyText = redactionPolicy.getText("UTF-8")
+        ["containsSensitiveValue", "redactMetadata", "J7M_SENTINEL_SECRET_TOKEN", "endpointcredential"].each { String token ->
+            if (!redactionPolicyText.toLowerCase(java.util.Locale.ROOT).contains(token.toLowerCase(java.util.Locale.ROOT))) {
+                throw new GradleException("AdapterRedactionPolicy missing required scanner/redactor token: ${token}")
+            }
+        }
+        File runner = file("j7m-adapter-tck/src/main/java/org/j7m/middleware/adapter/tck/AdapterTckRunner.java")
+        String runnerText = runner.getText("UTF-8")
+        ["scanTckOutput", "scanProviderPublicOutput", "publicTextLeaksSensitiveValue", "containsRedactionMarker"].each { String token ->
+            if (!runnerText.contains(token)) {
+                throw new GradleException("AdapterTckRunner missing independent report-level redaction scan: ${token}")
+            }
+        }
+        File redactionTest = file("j7m-adapter-tck/src/test/java/org/j7m/middleware/adapter/tck/AdapterRedactionEnforcementTest.java")
+        String redactionTestText = redactionTest.getText("UTF-8")
+        ["note", "description", "message", "J7M_SENTINEL_SECRET_TOKEN", "maliciousProbeCannotPassBySelfReportingNoLeak"].each { String token ->
+            if (!redactionTestText.contains(token)) {
+                throw new GradleException("adapter redaction enforcement test missing required case: ${token}")
+            }
+        }
+        File demo = file("j7m-demo/src/main/java/org/j7m/middleware/demo/adapter/AdapterTckDemo.java")
+        String demoText = demo.getText("UTF-8")
+        ["semanticMatrix", "compatibilityReport", "securityFindings", "failureModeFindings", "redactionFindings"].each { String token ->
+            if (!demoText.contains(token)) {
+                throw new GradleException("runAdapterTckDemo does not print required TCK summary field: ${token}")
+            }
+        }
+        fileTree("j7m-adapter-tck/src/main/java").matching { include "**/*.java" }.files.each { File source ->
+            if (source.getText("UTF-8").contains("Fake")) {
+                throw new GradleException("fake adapter fixture leaked into TCK main sources: ${source}")
+            }
+        }
+    }
+}

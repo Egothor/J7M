@@ -1,0 +1,6 @@
+{
+  "group": "org.j7m.examples",
+  "name": "annotation-security-audit",
+  "version": "1.0.0",
+  "mainClass": "org.j7m.examples.annotation.securityaudit.SecurityAuditApplication"
+}

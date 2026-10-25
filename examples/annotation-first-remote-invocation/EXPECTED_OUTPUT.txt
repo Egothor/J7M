@@ -1,0 +1,4 @@
+annotation-first remote descriptor: retry-safe quote attempts=2 deadline=250ms
+annotation-first remote one-way accepted: void
+annotation-first remote callback value: callback:invoice-7
+annotation-first remote non-idempotent: automatic-retry-disabled

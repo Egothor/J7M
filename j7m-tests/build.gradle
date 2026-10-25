@@ -1,0 +1,2340 @@
+// Copyright (c) 2026, Leo Galambos and the Egothor team
+// https://www.egothor.org
+// SPDX-License-Identifier: BSD-4-Clause
+// Licensed under the BSD 4-Clause License; see LICENSE for the full terms.
+// This product includes software developed by Leo Galambos and the Egothor
+// team (https://www.egothor.org).
+
+dependencies {
+    testImplementation project(":j7m-api")
+    testImplementation project(":j7m-kernel")
+    testImplementation project(":j7m-runtime")
+    testImplementation project(":j7m-durable-log")
+    testImplementation project(":j7m-messaging")
+    testImplementation project(":j7m-saga")
+    testImplementation project(":j7m-isolation")
+    testImplementation project(":j7m-application-platform")
+    testImplementation project(":j7m-transport-grpc")
+    testImplementation project(":j7m-transport-rmi")
+    testImplementation project(":j7m-examples")
+    testImplementation project(":j7m-testkit")
+    testImplementation libs.junit.jupiter
+    testRuntimeOnly libs.junit.platform.launcher
+}
+
+tasks.named("test") {
+    dependsOn ":j7m-examples:jar"
+    dependsOn ":examples:modular-hello-api:jar"
+    dependsOn ":examples:modular-hello-impl:jar"
+}
+
+def configureJ7mTestsTask = { Test task ->
+    task.testClassesDirs = sourceSets.test.output.classesDirs
+    task.classpath = sourceSets.test.runtimeClasspath
+    task.dependsOn ":j7m-examples:jar"
+    task.dependsOn ":examples:modular-hello-api:jar"
+    task.dependsOn ":examples:modular-hello-impl:jar"
+    task.shouldRunAfter tasks.named("test")
+}
+
+tasks.register("phase2DiscoveryIntegrationTest", Test) {
+    group = "verification"
+    description = "Runs the historical Phase 2 discovery tests used by example smoke diagnostics."
+    configureJ7mTestsTask(delegate)
+    filter {
+        includeTestsMatching "org.j7m.middleware.tests.Phase2DiscoveryIntegrationTest"
+    }
+}
+
+tasks.register("checkpoint4ValidationTest", Test) {
+    group = "verification"
+    description = "Runs the focused Wave 2 Checkpoint 4 Phase 2-4 validation slice."
+    configureJ7mTestsTask(delegate)
+    outputs.upToDateWhen { false }
+    doFirst {
+        rootProject.layout.buildDirectory.file("reports/j7m/checkpoint4/checkpoint4ValidationTest.marker").get().asFile.delete()
+    }
+    doLast {
+        File marker = rootProject.layout.buildDirectory.file("reports/j7m/checkpoint4/checkpoint4ValidationTest.marker").get().asFile
+        marker.parentFile.mkdirs()
+        marker.text = "PASS\n"
+    }
+    filter {
+        includeTestsMatching "org.j7m.middleware.tests.Phase2DiscoveryIntegrationTest"
+        includeTestsMatching "org.j7m.middleware.tests.Phase3SecurityIntegrationTest"
+        includeTestsMatching "org.j7m.middleware.tests.Phase4WorkloadIntegrationTest"
+        includeTestsMatching "org.j7m.middleware.tests.Phase41StreamingWorkloadFidelityTest"
+        includeTestsMatching "org.j7m.middleware.tests.ArchitectureBoundaryTest"
+    }
+}
+
+tasks.register("checkpoint4WorkloadDemoEvidence", JavaExec) {
+    group = "verification"
+    description = "Runs and captures the workload-processing demo for Wave 2 Checkpoint 4 evidence."
+    dependsOn ":j7m-examples:jar"
+    dependsOn ":j7m-demo:classes"
+    classpath = project(":j7m-demo").sourceSets.main.runtimeClasspath
+    mainClass = "org.j7m.middleware.demo.Phase1Demo"
+    args "workload-processing-example"
+    outputs.file rootProject.layout.buildDirectory.file("reports/j7m/checkpoint4/workload-demo.out")
+    outputs.file rootProject.layout.buildDirectory.file("reports/j7m/checkpoint4/workload-demo.marker")
+    outputs.upToDateWhen { false }
+    java.io.ByteArrayOutputStream capturedOutput = new java.io.ByteArrayOutputStream(4096)
+    standardOutput = capturedOutput
+    errorOutput = capturedOutput
+    doFirst {
+        capturedOutput.reset()
+        rootProject.layout.buildDirectory.file("reports/j7m/checkpoint4/workload-demo.marker").get().asFile.delete()
+    }
+    doLast {
+        File output = rootProject.layout.buildDirectory.file("reports/j7m/checkpoint4/workload-demo.out").get().asFile
+        File marker = rootProject.layout.buildDirectory.file("reports/j7m/checkpoint4/workload-demo.marker").get().asFile
+        output.parentFile.mkdirs()
+        output.setText(capturedOutput.toString("UTF-8"), "UTF-8")
+        marker.setText("PASS\n", "UTF-8")
+    }
+}
+
+tasks.register("checkpoint4StreamingDemoEvidence", JavaExec) {
+    group = "verification"
+    description = "Runs and captures the streaming-pipeline demo for Wave 2 Checkpoint 4 evidence."
+    dependsOn ":j7m-examples:jar"
+    dependsOn ":j7m-demo:classes"
+    classpath = project(":j7m-demo").sourceSets.main.runtimeClasspath
+    mainClass = "org.j7m.middleware.demo.Phase1Demo"
+    args "streaming-pipeline-example"
+    outputs.file rootProject.layout.buildDirectory.file("reports/j7m/checkpoint4/streaming-demo.out")
+    outputs.file rootProject.layout.buildDirectory.file("reports/j7m/checkpoint4/streaming-demo.marker")
+    outputs.upToDateWhen { false }
+    java.io.ByteArrayOutputStream capturedOutput = new java.io.ByteArrayOutputStream(4096)
+    standardOutput = capturedOutput
+    errorOutput = capturedOutput
+    doFirst {
+        capturedOutput.reset()
+        rootProject.layout.buildDirectory.file("reports/j7m/checkpoint4/streaming-demo.marker").get().asFile.delete()
+    }
+    doLast {
+        File output = rootProject.layout.buildDirectory.file("reports/j7m/checkpoint4/streaming-demo.out").get().asFile
+        File marker = rootProject.layout.buildDirectory.file("reports/j7m/checkpoint4/streaming-demo.marker").get().asFile
+        output.parentFile.mkdirs()
+        output.setText(capturedOutput.toString("UTF-8"), "UTF-8")
+        marker.setText("PASS\n", "UTF-8")
+    }
+}
+
+tasks.register("generateCheckpoint4Evidence") {
+    group = "verification"
+    description = "Generates current-run Wave 2 Checkpoint 4 evidence from focused tests and demos."
+    dependsOn tasks.named("checkpoint4ValidationTest")
+    dependsOn tasks.named("checkpoint4WorkloadDemoEvidence")
+    dependsOn tasks.named("checkpoint4StreamingDemoEvidence")
+    outputs.file rootProject.layout.buildDirectory.file("reports/j7m/wave2-checkpoint4-evidence.json")
+    outputs.file rootProject.layout.buildDirectory.file("reports/j7m/wave2-checkpoint4-evidence.md")
+    outputs.upToDateWhen { false }
+    doLast {
+        File resultDirectory = layout.buildDirectory.dir("test-results/checkpoint4ValidationTest").get().asFile
+        File checkpoint4Directory = rootProject.layout.buildDirectory.dir("reports/j7m/checkpoint4").get().asFile
+        Map<String, Object> summary = checkpoint4EvidenceSummary(resultDirectory)
+        Map<String, Object> suites = summary.suites as Map<String, Object>
+        boolean junitPass = checkpoint4CountsPass(summary)
+        boolean currentRunTasks = checkpoint4CurrentRunTaskEvidence(checkpoint4Directory)
+        boolean demoPass = checkpoint4DemoOutputPass(checkpoint4Directory)
+        Map<String, String> categories = [
+                operatorGuidance: "GUIDANCE_ONLY",
+                gradleTaskOutcomes: (currentRunTasks && junitPass && demoPass) ? "PASS" : "FAIL",
+                junitEvidence: junitPass ? "PASS" : "FAIL",
+                discoveryTrustEvidence: checkpoint4SuitePass(suites, "Phase2DiscoveryIntegrationTest") ? "PASS" : "FAIL",
+                authorizationContextEvidence: checkpoint4SuitePass(suites, "Phase3SecurityIntegrationTest") ? "PASS" : "FAIL",
+                deadlineCancellationEvidence: (checkpoint4SuitePass(suites, "Phase4WorkloadIntegrationTest")
+                        && checkpoint4SuitePass(suites, "Phase41StreamingWorkloadFidelityTest")) ? "PASS" : "FAIL",
+                hpRoutingEvidence: (checkpoint4SuitePass(suites, "Phase2DiscoveryIntegrationTest")
+                        && checkpoint4SuitePass(suites, "Phase4WorkloadIntegrationTest")) ? "PASS" : "FAIL",
+                streamingEvidence: (checkpoint4SuitePass(suites, "Phase41StreamingWorkloadFidelityTest")
+                        && checkpoint4SuitePass(suites, "Phase4WorkloadIntegrationTest")) ? "PASS" : "FAIL",
+                demoEvidence: demoPass ? "PASS" : "FAIL",
+                staticArchitecturePolicy: checkpoint4SuitePass(suites, "ArchitectureBoundaryTest") ? "PASS" : "FAIL"
+        ]
+        Process gitStatusProcess = new ProcessBuilder("git", "status", "--short")
+                .directory(rootProject.projectDir)
+                .redirectErrorStream(true)
+                .start()
+        String gitStatus = gitStatusProcess.inputStream.getText("UTF-8")
+        int gitStatusExit = gitStatusProcess.waitFor()
+        boolean dirtyTree = gitStatusExit == 0 && !gitStatus.trim().isEmpty()
+        List<String> executableCategories = categories.findAll { String key, String value -> key != "operatorGuidance" }.values().toList()
+        boolean allCategoriesPass = executableCategories.every { String value -> value == "PASS" }
+        String validationState = allCategoriesPass ? "PASS" : "FAIL"
+        Map<String, Object> evidence = [
+                scope: "Wave 2 Checkpoint 4 focused evidence",
+                validationTask: ":j7m-tests:checkpoint4ValidationTest",
+                demoTasks: [
+                        ":j7m-tests:checkpoint4WorkloadDemoEvidence",
+                        ":j7m-tests:checkpoint4StreamingDemoEvidence"
+                ],
+                tests: summary.counts,
+                categories: categories,
+                validationState: validationState,
+                dirtyWorkingTree: dirtyTree,
+                releaseState: dirtyTree ? "NON_RELEASE_DIRTY_TREE" : "NON_RELEASE_CLEAN_TREE",
+                releaseRecommendation: "DO_NOT_RELEASE_FROM_CHECKPOINT4_FOCUSED_EVIDENCE"
+        ]
+        File jsonOutput = rootProject.layout.buildDirectory.file("reports/j7m/wave2-checkpoint4-evidence.json").get().asFile
+        File markdownOutput = rootProject.layout.buildDirectory.file("reports/j7m/wave2-checkpoint4-evidence.md").get().asFile
+        jsonOutput.parentFile.mkdirs()
+        jsonOutput.text = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(evidence)) + "\n"
+        markdownOutput.text = checkpoint4EvidenceMarkdown(evidence)
+    }
+}
+
+tasks.register("validateCheckpoint4Evidence") {
+    group = "verification"
+    description = "Validates Wave 2 Checkpoint 4 focused evidence without issuing a release seal."
+    dependsOn tasks.named("generateCheckpoint4Evidence")
+    outputs.upToDateWhen { false }
+    doLast {
+        File evidenceFile = rootProject.layout.buildDirectory.file("reports/j7m/wave2-checkpoint4-evidence.json").get().asFile
+        File markdownFile = rootProject.layout.buildDirectory.file("reports/j7m/wave2-checkpoint4-evidence.md").get().asFile
+        Map<String, Object> evidence = new groovy.json.JsonSlurper().parse(evidenceFile) as Map<String, Object>
+        String markdown = markdownFile.getText("UTF-8")
+        if (evidence.validationState != "PASS") {
+            throw new GradleException("Checkpoint 4 focused evidence is not passing: ${evidence.validationState}")
+        }
+        if (!evidence.releaseState.toString().startsWith("NON_RELEASE_")) {
+            throw new GradleException("Checkpoint 4 focused evidence must not issue a release seal")
+        }
+        if (evidence.releaseRecommendation != "DO_NOT_RELEASE_FROM_CHECKPOINT4_FOCUSED_EVIDENCE") {
+            throw new GradleException("Checkpoint 4 focused evidence must keep a non-release recommendation")
+        }
+        checkpoint4EvidenceMarkdownLines(evidence).each { String line ->
+            if (!markdown.contains(line)) {
+                throw new GradleException("Checkpoint 4 Markdown evidence does not match JSON evidence for line: ${line}")
+            }
+        }
+        String rootPath = rootProject.projectDir.absolutePath
+        if (evidenceFile.getText("UTF-8").contains(rootPath) || markdown.contains(rootPath)) {
+            throw new GradleException("Checkpoint 4 evidence must not contain absolute workspace paths")
+        }
+    }
+}
+
+tasks.register("phase1RuntimeValidationTest", Test) {
+    group = "verification"
+    description = "Runs the focused Phase 1 runtime, codec, transport, callback, and Wave 1 correction evidence slice."
+    configureJ7mTestsTask(delegate)
+    outputs.upToDateWhen { false }
+    filter {
+        includeTestsMatching "org.j7m.middleware.tests.Phase1IntegrationTest"
+        includeTestsMatching "org.j7m.middleware.tests.DefaultValueCodecTest"
+        includeTestsMatching "org.j7m.middleware.tests.Wave1CorrectionTest"
+    }
+}
+
+tasks.register("generatePhase1Evidence") {
+    group = "verification"
+    description = "Generates current-run Phase 1 validation evidence from the focused Phase 1 test slice."
+    dependsOn tasks.named("phase1RuntimeValidationTest")
+    outputs.file rootProject.layout.buildDirectory.file("reports/j7m/phase-1-evidence.json")
+    outputs.file rootProject.layout.buildDirectory.file("reports/j7m/phase-1-evidence.md")
+    outputs.upToDateWhen { false }
+    doLast {
+        File resultDirectory = layout.buildDirectory.dir("test-results/phase1RuntimeValidationTest").get().asFile
+        Map<String, Integer> counts = [tests: 0, failures: 0, errors: 0, skipped: 0, suites: 0]
+        List<Map<String, Object>> junitArtifacts = []
+        if (resultDirectory.exists()) {
+            List<File> xmlFiles = fileTree(resultDirectory) {
+                include "TEST-*.xml"
+            }.files.toList().sort { File file -> file.name }
+            xmlFiles.each { File xml ->
+                junitArtifacts.add(w7EvidenceFileArtifact(rootProject.projectDir, xml))
+                String text = xml.getText("UTF-8")
+                java.util.regex.Matcher suiteMatcher = java.util.regex.Pattern
+                        .compile("<testsuite\\s+([^>]*)>")
+                        .matcher(text)
+                if (suiteMatcher.find()) {
+                    String attributes = suiteMatcher.group(1)
+                    counts.tests = counts.tests + xmlIntAttribute(attributes, "tests")
+                    counts.failures = counts.failures + xmlIntAttribute(attributes, "failures")
+                    counts.errors = counts.errors + xmlIntAttribute(attributes, "errors")
+                    counts.skipped = counts.skipped + xmlIntAttribute(attributes, "skipped")
+                    counts.suites = counts.suites + 1
+                }
+            }
+        }
+        Process gitStatusProcess = new ProcessBuilder("git", "status", "--short")
+                .directory(rootProject.projectDir)
+                .redirectErrorStream(true)
+                .start()
+        String gitStatus = gitStatusProcess.inputStream.getText("UTF-8")
+        gitStatusProcess.waitFor()
+        boolean dirtyTree = !gitStatus.trim().isEmpty()
+        String currentHead = w7RunGit(rootProject.projectDir, ["rev-parse", "HEAD"])
+        String validationState = counts.suites > 0 && counts.failures == 0 && counts.errors == 0 && counts.skipped == 0 ? "PASS" : "FAIL"
+        Map<String, Object> evidence = [
+                formatVersion: "j7m-phase1-evidence-v2",
+                scope: "Phase 1 focused runtime evidence",
+                generatedAt: java.time.Instant.now().toString(),
+                currentHead: currentHead,
+                validationTask: ":j7m-tests:phase1RuntimeValidationTest",
+                tests: counts,
+                junitArtifacts: junitArtifacts,
+                validationState: validationState,
+                dirtyWorkingTree: dirtyTree,
+                releaseState: dirtyTree ? "NON_RELEASE_DIRTY_TREE" : "NON_RELEASE_CLEAN_TREE",
+                releaseRecommendation: "DO_NOT_RELEASE_FROM_FOCUSED_PHASE1_EVIDENCE"
+        ]
+        evidence.currentRunIdentity = w7MapIdentity(evidence)
+        File jsonOutput = rootProject.layout.buildDirectory.file("reports/j7m/phase-1-evidence.json").get().asFile
+        File markdownOutput = rootProject.layout.buildDirectory.file("reports/j7m/phase-1-evidence.md").get().asFile
+        jsonOutput.parentFile.mkdirs()
+        jsonOutput.text = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(evidence)) + "\n"
+        markdownOutput.text = phase1EvidenceMarkdown(evidence)
+    }
+}
+
+tasks.register("validatePhase1Evidence") {
+    group = "verification"
+    description = "Validates the generated focused Phase 1 current-run evidence without issuing a release seal."
+    dependsOn tasks.named("generatePhase1Evidence")
+    outputs.upToDateWhen { false }
+    doLast {
+        File evidenceFile = rootProject.layout.buildDirectory.file("reports/j7m/phase-1-evidence.json").get().asFile
+        File markdownFile = rootProject.layout.buildDirectory.file("reports/j7m/phase-1-evidence.md").get().asFile
+        Map<String, Object> evidence = new groovy.json.JsonSlurper().parse(evidenceFile) as Map<String, Object>
+        String markdown = markdownFile.getText("UTF-8")
+        if (evidence.validationState != "PASS") {
+            throw new GradleException("Phase 1 focused validation evidence is not passing: ${evidence.validationState}")
+        }
+        if (!evidence.releaseState.toString().startsWith("NON_RELEASE_")) {
+            throw new GradleException("Phase 1 focused evidence must not issue a release seal")
+        }
+        if (evidence.releaseRecommendation != "DO_NOT_RELEASE_FROM_FOCUSED_PHASE1_EVIDENCE") {
+            throw new GradleException("Phase 1 focused evidence must keep a non-release recommendation")
+        }
+        if (evidence.formatVersion != "j7m-phase1-evidence-v2") {
+            throw new GradleException("Phase 1 evidence format is stale: ${evidence.formatVersion}")
+        }
+        if (evidence.currentHead != w7RunGit(rootProject.projectDir, ["rev-parse", "HEAD"])) {
+            throw new GradleException("Phase 1 evidence was generated for a stale HEAD")
+        }
+        if (evidence.currentRunIdentity != w7MapIdentity(evidence.findAll { Map.Entry<String, Object> entry ->
+            entry.key != "currentRunIdentity"
+        } as Map<String, Object>)) {
+            throw new GradleException("Phase 1 evidence current-run identity does not match report contents")
+        }
+        List<Map<String, Object>> artifactProblems = w7ValidateArtifacts(rootProject.projectDir, evidence.junitArtifacts as List<Object>)
+        if (!artifactProblems.isEmpty()) {
+            throw new GradleException("Phase 1 JUnit XML evidence is stale or missing: ${artifactProblems}")
+        }
+        List<String> expectedLines = phase1EvidenceMarkdownLines(evidence)
+        expectedLines.each { String line ->
+            if (!markdown.contains(line)) {
+                throw new GradleException("Phase 1 Markdown evidence does not match JSON evidence for line: ${line}")
+            }
+        }
+        String rootPath = rootProject.projectDir.absolutePath
+        if (evidenceFile.getText("UTF-8").contains(rootPath) || markdown.contains(rootPath)) {
+            throw new GradleException("Phase 1 evidence must not contain absolute workspace paths")
+        }
+    }
+}
+
+static int xmlIntAttribute(final String attributes, final String name) {
+    java.util.regex.Matcher matcher = java.util.regex.Pattern
+            .compile(name + "=\"(\\d+)\"")
+            .matcher(attributes)
+    return matcher.find() ? Integer.parseInt(matcher.group(1)) : 0
+}
+
+static String phase1EvidenceMarkdown(final Map<String, Object> evidence) {
+    List<String> lines = ["# Phase 1 Focused Evidence", ""]
+    lines.addAll(phase1EvidenceMarkdownLines(evidence))
+    lines.add("")
+    lines.add("This focused evidence is deterministic current-run validation output. It is not a release seal.")
+    return lines.join("\n") + "\n"
+}
+
+static List<String> phase1EvidenceMarkdownLines(final Map<String, Object> evidence) {
+    Map<String, Object> tests = evidence.tests as Map<String, Object>
+    return [
+            "- Format version: `${evidence.formatVersion}`",
+            "- Scope: `${evidence.scope}`",
+            "- Generated at: `${evidence.generatedAt}`",
+            "- Current HEAD: `${evidence.currentHead}`",
+            "- Current-run identity: `${evidence.currentRunIdentity}`",
+            "- Validation task: `${evidence.validationTask}`",
+            "- Test suites: `${tests.suites}`",
+            "- Tests: `${tests.tests}`",
+            "- Failures: `${tests.failures}`",
+            "- Errors: `${tests.errors}`",
+            "- Skipped: `${tests.skipped}`",
+            "- JUnit artifacts: `${(evidence.junitArtifacts as List<Object>).size()}`",
+            "- Validation state: `${evidence.validationState}`",
+            "- Dirty working tree: `${evidence.dirtyWorkingTree}`",
+            "- Release state: `${evidence.releaseState}`",
+            "- Release recommendation: `${evidence.releaseRecommendation}`"
+    ]
+}
+
+static String w7RunGit(final File root, final List<String> args) {
+    List<String> command = ["git"]
+    command.addAll(args)
+    Process process = new ProcessBuilder(command)
+            .directory(root)
+            .redirectErrorStream(true)
+            .start()
+    String output = process.inputStream.getText("UTF-8")
+    int exit = process.waitFor()
+    return exit == 0 ? output.trim() : "unavailable"
+}
+
+static Map<String, Object> w7EvidenceFileArtifact(final File root, final File file) {
+    return [
+            path: root.toPath().relativize(file.toPath()).toString().replace('\\', '/'),
+            sizeBytes: file.length(),
+            sha256: w7FileSha256(file)
+    ]
+}
+
+static List<Map<String, Object>> w7ValidateArtifacts(final File root, final List<Object> artifacts) {
+    List<Map<String, Object>> problems = []
+    if (artifacts == null || artifacts.isEmpty()) {
+        problems.add([path: "", problem: "missing-artifacts"])
+        return problems
+    }
+    artifacts.each { Object artifact ->
+        Map<String, Object> row = artifact as Map<String, Object>
+        String relative = row.path as String
+        File file = new File(root, relative)
+        if (!file.isFile()) {
+            problems.add([path: relative, problem: "missing"])
+        } else if (file.length() != (row.sizeBytes as Number).longValue()) {
+            problems.add([path: relative, problem: "size-mismatch"])
+        } else {
+            String digest = w7FileSha256(file)
+            if (digest != row.sha256) {
+                problems.add([path: relative, problem: "digest-mismatch"])
+            }
+        }
+    }
+    return problems
+}
+
+static List<Map<String, Object>> w7EvidenceArtifacts(final File root, final List<File> directories, final String suffix) {
+    List<Map<String, Object>> artifacts = []
+    directories.each { File directory ->
+        if (directory.isDirectory()) {
+            directory.listFiles()
+                    ?.findAll { File file -> file.isFile() && file.name.endsWith(suffix) }
+                    ?.sort { File file -> file.name }
+                    ?.each { File file -> artifacts.add(w7EvidenceFileArtifact(root, file)) }
+        }
+    }
+    return artifacts
+}
+
+static String w7MapIdentity(final Map<String, Object> evidence) {
+    return w7Sha256(groovy.json.JsonOutput.toJson(evidence).getBytes("UTF-8"))
+}
+
+static Map<String, Object> phase7StableIdentityInput(final Map<String, Object> evidence) {
+    return [
+            formatVersion: evidence.formatVersion,
+            scope: evidence.scope,
+            currentHead: evidence.currentHead,
+            validationTasks: evidence.validationTasks,
+            demoTasks: evidence.demoTasks,
+            evidenceDemoTasks: evidence.evidenceDemoTasks,
+            tests: evidence.tests,
+            requiredSuites: evidence.requiredSuites,
+            categories: evidence.categories,
+            validationState: evidence.validationState,
+            dirtyWorkingTree: evidence.dirtyWorkingTree,
+            releaseState: evidence.releaseState,
+            releaseRecommendation: evidence.releaseRecommendation
+    ]
+}
+
+static String phase7CurrentRunIdentity(final Map<String, Object> evidence) {
+    return w7MapIdentity(phase7StableIdentityInput(evidence))
+}
+
+static boolean phase7CurrentRunIdentitySelfCheck() {
+    Map<String, Object> first = [
+            formatVersion: "j7m-phase7-evidence-v8",
+            scope: "Phase 7.0-7.11 nugget operations final acceptance evidence",
+            generatedAt: "2026-01-01T00:00:00Z",
+            currentHead: "head-a",
+            validationTasks: [":j7m-tests:validateNuggetOperations"],
+            demoTasks: [":j7m-demo:runNuggetAdminDemo"],
+            evidenceDemoTasks: [":j7m-tests:phase7NuggetAdminDemoEvidence"],
+            tests: [tests: 10, failures: 0, errors: 0, skipped: 0],
+            requiredSuites: ["NuggetAdminStartupTest"],
+            categories: [phase711FinalAcceptance: "NOT_RELEASE_READY_DIRTY_TREE"],
+            validationState: "PASS",
+            dirtyWorkingTree: true,
+            releaseState: "TECHNICAL_PASS_DIRTY_TREE_RELEASE_SEAL_REQUIRES_OWNER_COMMIT",
+            releaseRecommendation: "DO_NOT_RELEASE_FROM_UNCOMMITTED_CURRENT_RUN_EVIDENCE",
+            junitArtifacts: [[path: "build/test-results/old.xml", sizeBytes: 1L, sha256: "old"]],
+            demoArtifacts: [[path: "build/reports/old.out", sizeBytes: 1L, sha256: "old"]]
+    ]
+    Map<String, Object> second = new LinkedHashMap<>(first)
+    second.generatedAt = "2026-01-01T00:00:01Z"
+    second.currentRunIdentity = "ignored"
+    second.junitArtifacts = [[path: "build/test-results/rewritten.xml", sizeBytes: 2L, sha256: "rewritten"]]
+    second.demoArtifacts = [[path: "build/reports/rewritten.out", sizeBytes: 2L, sha256: "rewritten"]]
+    Map<String, Object> changedStableField = new LinkedHashMap<>(first)
+    changedStableField.tests = [tests: 11, failures: 0, errors: 0, skipped: 0]
+    Map<String, Object> changedScope = new LinkedHashMap<>(first)
+    changedScope.scope = "Phase 7.0-7.9 nugget operations current-run evidence"
+    Map<String, Object> changedFinalState = new LinkedHashMap<>(first)
+    changedFinalState.categories = [phase711FinalAcceptance: "PASS"]
+    return phase7CurrentRunIdentity(first) == phase7CurrentRunIdentity(second)
+            && phase7CurrentRunIdentity(first) != phase7CurrentRunIdentity(changedStableField)
+            && phase7CurrentRunIdentity(first) != phase7CurrentRunIdentity(changedScope)
+            && phase7CurrentRunIdentity(first) != phase7CurrentRunIdentity(changedFinalState)
+}
+
+static String w7FileSha256(final File file) {
+    java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256")
+    byte[] buffer = new byte[8192]
+    try (java.io.InputStream input = new java.io.BufferedInputStream(new java.io.FileInputStream(file))) {
+        int read = input.read(buffer)
+        while (read >= 0) {
+            digest.update(buffer, 0, read)
+            read = input.read(buffer)
+        }
+    }
+    return w7Hex(digest.digest())
+}
+
+static String w7Sha256(final byte[] bytes) {
+    java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256")
+    digest.update(bytes)
+    return w7Hex(digest.digest())
+}
+
+static String w7Hex(final byte[] bytes) {
+    char[] alphabet = "0123456789abcdef".toCharArray()
+    char[] chars = new char[bytes.length * 2]
+    for (int index = 0; index < bytes.length; index++) {
+        int value = bytes[index] & 0xff
+        chars[index * 2] = alphabet[value >>> 4]
+        chars[(index * 2) + 1] = alphabet[value & 0x0f]
+    }
+    return new String(chars)
+}
+
+static Map<String, Object> checkpoint4EvidenceSummary(final File resultDirectory) {
+    Map<String, Integer> counts = [tests: 0, failures: 0, errors: 0, skipped: 0, suites: 0]
+    Map<String, Object> suites = [:]
+    boolean malformed = false
+    if (!resultDirectory.exists()) {
+        return [counts: counts, suites: suites, malformed: true]
+    }
+    List<File> xmlFiles = resultDirectory.listFiles()
+            ?.findAll { File file -> file.name.startsWith("TEST-") && file.name.endsWith(".xml") }
+            ?.sort { File file -> file.name } ?: []
+    if (xmlFiles.isEmpty()) {
+        return [counts: counts, suites: suites, malformed: true]
+    }
+    xmlFiles.each { File xml ->
+        String text = xml.getText("UTF-8")
+        java.util.regex.Matcher suiteMatcher = java.util.regex.Pattern
+                .compile("<testsuite\\s+([^>]*)>")
+                .matcher(text)
+        if (!suiteMatcher.find()) {
+            malformed = true
+            return
+        }
+        String attributes = suiteMatcher.group(1)
+        String name = xmlStringAttribute(attributes, "name")
+        int tests = xmlIntAttribute(attributes, "tests")
+        int failures = xmlIntAttribute(attributes, "failures")
+        int errors = xmlIntAttribute(attributes, "errors")
+        int skipped = xmlIntAttribute(attributes, "skipped")
+        if (name.isBlank() || tests <= 0 || failures < 0 || errors < 0 || skipped < 0) {
+            malformed = true
+        }
+        counts.tests = counts.tests + tests
+        counts.failures = counts.failures + failures
+        counts.errors = counts.errors + errors
+        counts.skipped = counts.skipped + skipped
+        counts.suites = counts.suites + 1
+        suites[name] = [
+                tests: tests,
+                failures: failures,
+                errors: errors,
+                skipped: skipped,
+                pass: tests > 0 && failures == 0 && errors == 0 && skipped == 0
+        ]
+    }
+    return [counts: counts, suites: suites, malformed: malformed]
+}
+
+static boolean checkpoint4CountsPass(final Map<String, Object> summary) {
+    Map<String, Integer> counts = summary.counts as Map<String, Integer>
+    return !(summary.malformed as Boolean)
+            && counts.suites > 0
+            && counts.tests > 0
+            && counts.failures == 0
+            && counts.errors == 0
+            && counts.skipped == 0
+}
+
+static boolean checkpoint4SuitePass(final Map<String, Object> suites, final String className) {
+    Map.Entry<String, Object> match = suites.find { Map.Entry<String, Object> entry -> entry.key.endsWith(className) }
+    if (match == null) {
+        return false
+    }
+    Map<String, Object> suite = match.value as Map<String, Object>
+    return suite.pass as Boolean
+}
+
+static boolean checkpoint4FilesPresent(final File root) {
+    return new File(root, "README.md").isFile()
+            && new File(root, "documentation/docs/overview/architecture.md").isFile()
+            && new File(root, "documentation/docs/overview/capabilities.md").isFile()
+}
+
+static boolean checkpoint4DemoEvidencePresent(final File root) {
+    return new File(root, "examples/workload-processing/EXPECTED_OUTPUT.txt").isFile()
+            && new File(root, "examples/streaming-pipeline/EXPECTED_OUTPUT.txt").isFile()
+}
+
+static boolean checkpoint4CurrentRunTaskEvidence(final File checkpoint4Directory) {
+    return checkpoint4MarkerPass(new File(checkpoint4Directory, "checkpoint4ValidationTest.marker"))
+            && checkpoint4MarkerPass(new File(checkpoint4Directory, "workload-demo.marker"))
+            && checkpoint4MarkerPass(new File(checkpoint4Directory, "streaming-demo.marker"))
+}
+
+static boolean checkpoint4DemoOutputPass(final File checkpoint4Directory) {
+    File workloadOutput = new File(checkpoint4Directory, "workload-demo.out")
+    File streamingOutput = new File(checkpoint4Directory, "streaming-demo.out")
+    return checkpoint4OutputContains(workloadOutput, [
+            "phase5.5 workload verify accepted: true",
+            "phase5.5 workload checkpoint: checkpoint-task-1",
+            "phase5.5 workload stale fence accepted: false",
+            "phase5.5 workload cancelled state: CANCELLED",
+            "phase5.5 workload registry after stop: 0",
+            "phase5.5 workload active after unload: 0"
+    ]) && checkpoint4OutputContains(streamingOutput, [
+            "phase5.5 streaming verify accepted: true",
+            "phase5.5 streaming server batch: [server-item-1, server-item-2]",
+            "phase5.5 streaming exchange server items: [server-item-3]",
+            "phase5.5 streaming oversized rejected: 1",
+            "phase5.5 streaming backpressure: true",
+            "phase5.5 streaming active after unload: 0"
+    ])
+}
+
+static boolean checkpoint4MarkerPass(final File marker) {
+    return marker.isFile() && marker.getText("UTF-8").trim() == "PASS"
+}
+
+static boolean checkpoint4OutputContains(final File output, final List<String> expectedLines) {
+    if (!output.isFile()) {
+        return false
+    }
+    String text = output.getText("UTF-8")
+    if (text.isBlank() || text.contains("Exception") || text.contains("FAILED")) {
+        return false
+    }
+    return expectedLines.every { String line -> text.contains(line) }
+}
+
+static String xmlStringAttribute(final String attributes, final String name) {
+    java.util.regex.Matcher matcher = java.util.regex.Pattern
+            .compile(name + "=\"([^\"]*)\"")
+            .matcher(attributes)
+    return matcher.find() ? matcher.group(1) : ""
+}
+
+static String checkpoint4EvidenceMarkdown(final Map<String, Object> evidence) {
+    List<String> lines = ["# Wave 2 Checkpoint 4 Focused Evidence", ""]
+    lines.addAll(checkpoint4EvidenceMarkdownLines(evidence))
+    lines.add("")
+    lines.add("This focused evidence is deterministic current-run validation output. It is not a release seal.")
+    return lines.join("\n") + "\n"
+}
+
+static List<String> checkpoint4EvidenceMarkdownLines(final Map<String, Object> evidence) {
+    Map<String, Object> tests = evidence.tests as Map<String, Object>
+    Map<String, Object> categories = evidence.categories as Map<String, Object>
+    List<String> lines = [
+            "- Scope: `${evidence.scope}`",
+            "- Validation task: `${evidence.validationTask}`",
+            "- Test suites: `${tests.suites}`",
+            "- Tests: `${tests.tests}`",
+            "- Failures: `${tests.failures}`",
+            "- Errors: `${tests.errors}`",
+            "- Skipped: `${tests.skipped}`"
+    ]
+    categories.keySet().sort().each { String key ->
+        lines.add("- ${key}: `${categories[key]}`")
+    }
+    lines.add("- Validation state: `${evidence.validationState}`")
+    lines.add("- Dirty working tree: `${evidence.dirtyWorkingTree}`")
+    lines.add("- Release state: `${evidence.releaseState}`")
+    lines.add("- Release recommendation: `${evidence.releaseRecommendation}`")
+    return lines
+}
+
+static List<File> phase7ResultDirectories(final Project project, final Project rootProject) {
+    return [
+            new File(project.buildDir, "test-results/validateNuggetAdmin"),
+            new File(project.buildDir, "test-results/validateNuggetSecurity"),
+            new File(project.buildDir, "test-results/validateNuggetDiscovery"),
+            new File(project.buildDir, "test-results/validateNuggetIntrospectionRedaction"),
+            new File(project.buildDir, "test-results/validateNuggetInspection"),
+            new File(project.buildDir, "test-results/validateNuggetApplicationLifecycle"),
+            new File(project.buildDir, "test-results/validateNuggetShutdownControls"),
+            new File(project.buildDir, "test-results/validateNuggetAdminApiContract"),
+            new File(project.buildDir, "test-results/validateNuggetPublicApiBoundary"),
+            new File(rootProject.project(":j7m-deployer-cli").buildDir, "test-results/validateJ7mCliConsole")
+    ]
+}
+
+static List<String> phase7RequiredSuites() {
+    return [
+            "NuggetAdminStartupTest",
+            "NuggetAdminInternalCoverageTest",
+            "NuggetPinAuthTest",
+            "NuggetAuditSecurityTest",
+            "NuggetDiscoveryTest",
+            "NuggetIntrospectionTest",
+            "NuggetApplicationLifecycleTest",
+            "NuggetShutdownControlTest",
+            "NuggetAdminApiContractTest",
+            "NuggetPhase7DocumentationConsistencyTest",
+            "J7mCliTest"
+    ]
+}
+
+static int phase7MaxXmlFilesPerDirectory() {
+    return 64
+}
+
+static int phase7MaxXmlBytes() {
+    return 256 * 1024
+}
+
+static int phase7MaxDemoBytes() {
+    return 64 * 1024
+}
+
+static int phase7MaxDocumentationBytes() {
+    return 512 * 1024
+}
+
+static Map<String, Object> phase7EvidenceSummary(final List<File> resultDirectories) {
+    Map<String, Integer> counts = [tests: 0, failures: 0, errors: 0, skipped: 0, suites: 0]
+    Map<String, Object> suites = [:]
+    boolean malformed = false
+    resultDirectories.each { File resultDirectory ->
+        if (!resultDirectory.isDirectory()) {
+            malformed = true
+            return
+        }
+        List<File> xmlFiles = phase7BoundedEvidenceFiles(resultDirectory, ".xml", phase7MaxXmlFilesPerDirectory())
+        if (xmlFiles == null) {
+            malformed = true
+            return
+        }
+        if (xmlFiles.isEmpty()) {
+            malformed = true
+        }
+        xmlFiles.each { File xml ->
+            String text = phase7ReadBoundedText(xml, phase7MaxXmlBytes())
+            if (text == null) {
+                malformed = true
+                return
+            }
+            java.util.regex.Matcher suiteMatcher = java.util.regex.Pattern
+                    .compile("<testsuite\\s+([^>]*)>")
+                    .matcher(text)
+            if (!suiteMatcher.find()) {
+                malformed = true
+                return
+            }
+            String attributes = suiteMatcher.group(1)
+            String name = xmlStringAttribute(attributes, "name")
+            Integer testsValue = phase7XmlRequiredIntAttribute(attributes, "tests")
+            Integer failuresValue = phase7XmlRequiredIntAttribute(attributes, "failures")
+            Integer errorsValue = phase7XmlRequiredIntAttribute(attributes, "errors")
+            Integer skippedValue = phase7XmlRequiredIntAttribute(attributes, "skipped")
+            if (name.isBlank() || testsValue == null || failuresValue == null
+                    || errorsValue == null || skippedValue == null) {
+                malformed = true
+            } else if (testsValue <= 0 || failuresValue < 0 || errorsValue < 0 || skippedValue < 0) {
+                malformed = true
+            } else {
+                int tests = testsValue
+                int failures = failuresValue
+                int errors = errorsValue
+                int skipped = skippedValue
+                counts.tests = counts.tests + tests
+                counts.failures = counts.failures + failures
+                counts.errors = counts.errors + errors
+                counts.skipped = counts.skipped + skipped
+                counts.suites = counts.suites + 1
+                suites[name] = [
+                        tests: tests,
+                        failures: failures,
+                        errors: errors,
+                        skipped: skipped,
+                        pass: tests > 0 && failures == 0 && errors == 0 && skipped == 0
+                ]
+            }
+        }
+    }
+    return [counts: counts, suites: suites, malformed: malformed]
+}
+
+static Integer phase7XmlRequiredIntAttribute(final String attributes, final String name) {
+    java.util.regex.Matcher matcher = java.util.regex.Pattern
+            .compile(name + "=\"(\\d+)\"")
+            .matcher(attributes)
+    return matcher.find() ? Integer.valueOf(matcher.group(1)) : null
+}
+
+static List<File> phase7BoundedEvidenceFiles(final File directory, final String suffix, final int maxFiles) {
+    List<File> files = []
+    try (java.nio.file.DirectoryStream<java.nio.file.Path> stream =
+                 java.nio.file.Files.newDirectoryStream(directory.toPath())) {
+        Iterator<java.nio.file.Path> iterator = stream.iterator()
+        while (iterator.hasNext()) {
+            java.nio.file.Path path = iterator.next()
+            File file = path.toFile()
+            if (file.isFile() && file.name.startsWith("TEST-") && file.name.endsWith(suffix)) {
+                files.add(file)
+                if (files.size() > maxFiles) {
+                    return null
+                }
+            }
+        }
+    } catch (IOException exception) {
+        return null
+    }
+    files.sort { File file -> file.name }
+    return files
+}
+
+static List<File> phase7BoundedDigestFiles(final File directory, final int maxFiles) {
+    List<File> files = []
+    try (java.nio.file.DirectoryStream<java.nio.file.Path> stream =
+                 java.nio.file.Files.newDirectoryStream(directory.toPath())) {
+        Iterator<java.nio.file.Path> iterator = stream.iterator()
+        while (iterator.hasNext()) {
+            java.nio.file.Path path = iterator.next()
+            File file = path.toFile()
+            if (file.isFile() && (file.name.endsWith(".xml") || file.name.endsWith(".out"))) {
+                files.add(file)
+                if (files.size() > maxFiles) {
+                    return null
+                }
+            }
+        }
+    } catch (IOException exception) {
+        return null
+    }
+    files.sort { File file -> file.name }
+    return files
+}
+
+static String phase7ReadBoundedText(final File file, final int maxBytes) {
+    byte[] bytes = phase7ReadBoundedBytes(file, maxBytes)
+    return bytes == null ? null : new String(bytes, "UTF-8")
+}
+
+static byte[] phase7ReadBoundedBytes(final File file, final int maxBytes) {
+    if (!file.isFile()) {
+        return null
+    }
+    java.io.ByteArrayOutputStream output = new java.io.ByteArrayOutputStream(Math.min(maxBytes, 8192))
+    byte[] buffer = new byte[8192]
+    int total = 0
+    try (java.io.InputStream input = new java.io.BufferedInputStream(new java.io.FileInputStream(file))) {
+        int read = input.read(buffer)
+        while (read >= 0) {
+            total += read
+            if (total > maxBytes) {
+                return null
+            }
+            output.write(buffer, 0, read)
+            read = input.read(buffer)
+        }
+    } catch (IOException exception) {
+        return null
+    }
+    return output.toByteArray()
+}
+
+static boolean phase7CountsPass(final Map<String, Object> summary) {
+    Map<String, Integer> counts = summary.counts as Map<String, Integer>
+    return !(summary.malformed as Boolean)
+            && counts.suites > 0
+            && counts.tests > 0
+            && counts.failures == 0
+            && counts.errors == 0
+            && counts.skipped == 0
+}
+
+static boolean phase7MalformedSuiteSelfCheck(final File scratchRoot) {
+    File directory = new File(scratchRoot, "phase7-malformed-suite-self-check")
+    directory.mkdirs()
+    File xml = new File(directory, "TEST-MalformedSuite.xml")
+    xml.setText("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+            + "<testsuite name=\"MalformedSuite\" tests=\"1\"></testsuite>\n", "UTF-8")
+    Map<String, Object> summary = phase7EvidenceSummary([directory])
+    File tooManyDirectory = new File(scratchRoot, "phase7-too-many-suite-self-check")
+    tooManyDirectory.mkdirs()
+    for (int index = 0; index <= phase7MaxXmlFilesPerDirectory(); index++) {
+        File extra = new File(tooManyDirectory, "TEST-TooMany-" + index + ".xml")
+        extra.setText("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+                + "<testsuite name=\"TooMany${index}\" tests=\"1\" failures=\"0\" errors=\"0\" skipped=\"0\"></testsuite>\n",
+                "UTF-8")
+    }
+    Map<String, Object> tooManySummary = phase7EvidenceSummary([tooManyDirectory])
+    File oversizedDirectory = new File(scratchRoot, "phase7-oversized-suite-self-check")
+    oversizedDirectory.mkdirs()
+    File oversized = new File(oversizedDirectory, "TEST-Oversized.xml")
+    oversized.setText("x".repeat(phase7MaxXmlBytes() + 1), "UTF-8")
+    Map<String, Object> oversizedSummary = phase7EvidenceSummary([oversizedDirectory])
+    File oversizedDemo = new File(scratchRoot, "phase7-oversized-demo.out")
+    oversizedDemo.setText("x".repeat(phase7MaxDemoBytes() + 1), "UTF-8")
+    return (summary.malformed as Boolean) && !phase7CountsPass(summary)
+            && (tooManySummary.malformed as Boolean) && !phase7CountsPass(tooManySummary)
+            && (oversizedSummary.malformed as Boolean) && !phase7CountsPass(oversizedSummary)
+            && !phase7OutputContains(oversizedDemo, ["x"])
+}
+
+static boolean phase7RequiredSuitesPass(final Map<String, Object> summary, final List<String> requiredSuites) {
+    if (!phase7CountsPass(summary)) {
+        return false
+    }
+    Map<String, Object> suites = summary.suites as Map<String, Object>
+    return requiredSuites.every { String requiredSuite -> phase7SuitePass(suites, requiredSuite) }
+}
+
+static boolean phase7SuitePass(final Map<String, Object> suites, final String className) {
+    Map.Entry<String, Object> match = suites.find { Map.Entry<String, Object> entry -> entry.key.endsWith(className) }
+    if (match == null) {
+        return false
+    }
+    Map<String, Object> suite = match.value as Map<String, Object>
+    return suite.pass as Boolean
+}
+
+static boolean phase7DemoOutputPass(final File phase7Directory) {
+    return phase7OutputContains(new File(phase7Directory, "nugget-admin-demo.out"), [
+            "phase7 nugget admin demo: local-in-process",
+            "phase7 nugget admin auth outcome: ACCEPTED",
+            "phase7 nugget admin overview admitted: true",
+            "phase7 nugget admin overview authorized: true",
+            "phase7 nugget admin remote transport: deferred"
+    ]) && phase7OutputContains(new File(phase7Directory, "nugget-cli-demo.out"), [
+            "phase7 nugget cli demo: production-entrypoint",
+            "phase7 nugget cli inspection commands: ps objects apps env disk health readiness metrics errors",
+            "phase7 nugget cli exit code: 0",
+            "phase7 nugget cli all-nugget prompt visible: true",
+            "phase7 nugget cli discovery visible: true",
+            "phase7 nugget cli all-nugget target visible: true",
+            "phase7 nugget cli selected-nugget prompt visible: true",
+            "phase7 nugget cli selected-nugget target visible: true",
+            "phase7 nugget cli status command visible: true",
+            "phase7 nugget cli returned all-nugget mode: true",
+            "phase7 nugget cli json envelope: true",
+            "phase7 nugget cli ps output: true",
+            "phase7 nugget cli no secret leakage: true"
+    ]) && phase7OutputContains(new File(phase7Directory, "nugget-cli-application-lifecycle-demo.out"), [
+            "phase7.6 nugget cli lifecycle demo: real-application-manager",
+            "phase7.6 nugget cli lifecycle discovery/select/auth: true",
+            "phase7.6 nugget cli lifecycle start dry-run: true",
+            "phase7.6 nugget cli lifecycle start exact coordinate: true",
+            "phase7.6 nugget cli lifecycle apps status: true",
+            "phase7.6 nugget cli lifecycle drain: true",
+            "phase7.6 nugget cli lifecycle stop: true",
+            "phase7.6 nugget cli lifecycle service after stop candidates: 0",
+            "phase7.6 nugget cli lifecycle unload: true",
+            "phase7.6 nugget cli lifecycle audit safe redaction: true"
+    ]) && phase7OutputContains(new File(phase7Directory, "nugget-cli-kill-disabled-demo.out"), [
+            "phase7.7 nugget cli kill-disabled demo: public-contracts",
+            "phase7.7 nugget cli discovery exact target auth: true",
+            "phase7.7 nugget cli drain safe partial: true",
+            "phase7.7 nugget cli shutdown confirmation-required: true",
+            "phase7.7 nugget cli kill disabled despite confirmation: true",
+            "phase7.7 nugget cli no arbitrary process control: true",
+            "phase7.7 nugget cli no jvm termination: true",
+            "phase7.7 nugget cli audit/output safe: true"
+    ]) && phase7OutputContains(new File(phase7Directory, "nugget-pin-failure-demo.out"), [
+            "phase7 nugget pin failure demo: production-cli-entrypoint",
+            "phase7 nugget pin failure cli exit non-success: true",
+            "phase7 nugget pin failure cli denial stable: true",
+            "phase7 nugget pin failure outcome: REJECTED",
+            "phase7 nugget pin failure accepted: false",
+            "phase7 nugget pin failure secret printed: false"
+    ])
+}
+
+static boolean phase7OutputContains(final File output, final List<String> expectedLines) {
+    if (!output.isFile()) {
+        return false
+    }
+    String text = phase7ReadBoundedText(output, phase7MaxDemoBytes())
+    if (text == null) {
+        return false
+    }
+    if (text.isBlank() || text.contains("Exception") || text.contains("FAILED")
+            || text.contains("SECRET-SENTINEL") || text.contains("740001") || text.contains("wrong")) {
+        return false
+    }
+    return expectedLines.every { String line -> text.contains(line) }
+}
+
+/* Validate current public operator contracts, never private milestone receipts. */
+static boolean phase7DocumentationPass(final File root) {
+    Map<String, List<String>> contracts = [
+            "documentation/docs/reference/cli.md": ["NuggetCliClientProvider", "start COORDINATE", "shutdown-nugget NUGGET", "kill-nugget NUGGET", "--dry-run", "--pin-env"],
+            "documentation/docs/reference/admin-api.md": ["NuggetAdminService", "NuggetAdminRequestContext", "NuggetAdminQuery", "authorization", "generation", "deadline", "outcome unknown"],
+            "documentation/docs/reference/admin-json.md": ["j7m-nugget-admin-json", "operationKind", "payloadType", "HTTP", "authorization", "Schema validity"],
+            "documentation/docs/reference/schemas/nugget-admin-contract.schema.json": ['"operationKind"', '"payloadType"', '"additionalProperties"'],
+            "documentation/docs/security/administrative-pin.md": ["PIN", "throttl", "persist"],
+            "examples/nugget-admin-console/README.md": ["safe PIN", "kill-disabled"]
+    ]
+    return contracts.every { String relative, List<String> markers ->
+        File source = new File(root, relative)
+        String text = source.isFile() ? phase7ReadBoundedText(source, phase7MaxDocumentationBytes()) : null
+        return text != null && markers.every { String marker -> text.contains(marker) }
+    }
+}
+
+static Map<String, String> phase7AcceptanceCategories(
+        final Map<String, Object> suites,
+        final boolean requiredSuitesPass,
+        final boolean demoPass,
+        final boolean documentationPass,
+        final boolean dirtyTree) {
+    boolean publicBoundaryPass = phase7SuitePass(suites, "NuggetPhase7DocumentationConsistencyTest")
+    Map<String, String> categories = [
+            operatorGuidance: "GUIDANCE_ONLY",
+            gradleTaskOutcomes: requiredSuitesPass && demoPass && documentationPass ? "PASS" : "FAIL",
+            junitEvidence: requiredSuitesPass ? "PASS" : "FAIL",
+            pinSecurity: phase7SuitePass(suites, "NuggetPinAuthTest") && phase7SuitePass(suites, "NuggetAuditSecurityTest") ? "PASS" : "FAIL",
+            discovery: phase7SuitePass(suites, "NuggetDiscoveryTest") ? "PASS" : "FAIL",
+            introspectionRedaction: phase7SuitePass(suites, "NuggetIntrospectionTest") ? "PASS" : "FAIL",
+            phase75Inspection: phase7SuitePass(suites, "NuggetIntrospectionTest") && phase7SuitePass(suites, "J7mCliTest") ? "PASS" : "FAIL",
+            phase76ApplicationLifecycle: phase7SuitePass(suites, "NuggetApplicationLifecycleTest")
+                    && phase7SuitePass(suites, "J7mCliTest") ? "PASS" : "FAIL",
+            phase77ShutdownControls: phase7SuitePass(suites, "NuggetShutdownControlTest")
+                    && phase7SuitePass(suites, "J7mCliTest") ? "PASS" : "FAIL",
+            adminApiContract: phase7SuitePass(suites, "NuggetAdminApiContractTest") ? "PASS" : "FAIL",
+            jsonContractSchema: phase7SuitePass(suites, "NuggetAdminApiContractTest") ? "PASS" : "FAIL",
+            cliPublicContractEquivalence: phase7SuitePass(suites, "J7mCliTest")
+                    && phase7SuitePass(suites, "NuggetAdminApiContractTest") ? "PASS" : "FAIL",
+            noWebDependency: phase7SuitePass(suites, "NuggetAdminApiContractTest") ? "PASS" : "FAIL",
+            resourceMapping: phase7SuitePass(suites, "NuggetAdminApiContractTest") ? "PASS" : "FAIL",
+            phase79SecurityHardening: phase7SuitePass(suites, "NuggetPinAuthTest")
+                    && phase7SuitePass(suites, "NuggetAuditSecurityTest")
+                    && phase7SuitePass(suites, "NuggetIntrospectionTest")
+                    && phase7SuitePass(suites, "J7mCliTest")
+                    && publicBoundaryPass ? "PASS" : "FAIL",
+            phase710DemosExamplesDocs: demoPass && documentationPass ? "PASS" : "FAIL",
+            cli: phase7SuitePass(suites, "J7mCliTest") ? "PASS" : "FAIL",
+            demo: demoPass ? "PASS" : "FAIL",
+            architectureStaticPolicy: publicBoundaryPass && documentationPass ? "PASS" : "FAIL",
+            zeroSkippedRequiredTests: requiredSuitesPass ? "PASS" : "FAIL"
+    ]
+    categories.phase711FinalAcceptance = phase7ExecutableCategoriesPass(categories)
+            ? (dirtyTree ? "NOT_RELEASE_READY_DIRTY_TREE" : "PASS")
+            : "FAILED"
+    return categories
+}
+
+/* The generated JSON and Markdown must agree exactly; no checked-in receipt is evidence. */
+static boolean phase7ReportEvidencePass(final File root, final Map<String, Object> evidence) {
+    File report = new File(root, "build/reports/j7m/phase7/phase-7-acceptance.md")
+    String markdown = report.isFile() ? phase7ReadBoundedText(report, phase7MaxDocumentationBytes()) : null
+    return markdown != null && markdown == phase7EvidenceMarkdown(evidence)
+}
+
+static boolean phase7LedgerTextMatchesEvidence(final String ledger, final Map<String, Object> evidence) {
+    if (ledger == null || ledger.isBlank()) {
+        return false
+    }
+    Map<String, Long> generatedTotals = phase7GeneratedEvidenceTotals(evidence)
+    Map<String, Long> ledgerTotals = phase7LedgerStableEvidenceTotals(ledger)
+    if (generatedTotals == null || ledgerTotals == null) {
+        return false
+    }
+    Map<String, Object> categories = evidence.categories as Map<String, Object>
+    String scope = evidence.scope == null ? "" : evidence.scope.toString()
+    String finalAcceptance = categories == null || categories.phase711FinalAcceptance == null
+            ? ""
+            : categories.phase711FinalAcceptance.toString()
+    String currentRunIdentity = evidence.currentRunIdentity == null ? "" : evidence.currentRunIdentity.toString()
+    boolean ledgerHasHardCodedIdentity = ledger.contains("Evidence current-run identity:")
+            || ledger.contains("Current-run identity:")
+            || (!currentRunIdentity.isBlank() && ledger.contains(currentRunIdentity))
+    boolean generatedStableCountsPass = generatedTotals.failures == 0L
+            && generatedTotals.errors == 0L
+            && generatedTotals.skipped == 0L
+    return ledger.contains("IMPLEMENTED_READY_FOR_OWNER_COMMIT_AND_FINAL_PHASE7_11_REVIEW")
+            && ledger.contains(scope)
+            && phase7EvidenceTotalsEqual(ledgerTotals, generatedTotals)
+            && generatedStableCountsPass
+            && ledger.contains("0 failures, 0 errors, 0 skipped tests")
+            && !ledgerHasHardCodedIdentity
+            && ledger.contains("excludes volatile `generatedAt` and obsolete `junitArtifacts`/`demoArtifacts`")
+            && ledger.contains("phase711FinalAcceptance")
+            && (finalAcceptance == "PASS" || finalAcceptance == "NOT_RELEASE_READY_DIRTY_TREE" || finalAcceptance == "FAILED")
+            && !ledger.contains("phase711DeferredFeatures")
+            && !ledger.contains("Phase 7.10 accepted")
+            && !ledger.contains("Phase 7.11 accepted")
+}
+
+static boolean phase7GeneratedDirtyNonReleaseStatePass(final Map<String, Object> evidence) {
+    return evidence.dirtyWorkingTree == true
+            && evidence.releaseState == "TECHNICAL_PASS_DIRTY_TREE_RELEASE_SEAL_REQUIRES_OWNER_COMMIT"
+            && evidence.releaseRecommendation == "DO_NOT_RELEASE_FROM_UNCOMMITTED_CURRENT_RUN_EVIDENCE"
+}
+
+static boolean phase7GeneratedReleaseStatePass(final Map<String, Object> evidence, final boolean currentDirtyTree) {
+    if (currentDirtyTree) {
+        return evidence.dirtyWorkingTree == true
+                && evidence.releaseState == "TECHNICAL_PASS_DIRTY_TREE_RELEASE_SEAL_REQUIRES_OWNER_COMMIT"
+                && evidence.releaseRecommendation == "DO_NOT_RELEASE_FROM_UNCOMMITTED_CURRENT_RUN_EVIDENCE"
+    }
+    return evidence.dirtyWorkingTree == false
+            && evidence.releaseState == "PHASE7_RELEASE_ACCEPTED"
+            && evidence.releaseRecommendation == "ACCEPT_PHASE7_RELEASE"
+}
+
+static List<String> phase7CurrentSemanticProblems(
+        final Map<String, Object> evidence,
+        final Map<String, Object> currentSummary,
+        final Map<String, String> currentCategories,
+        final String currentHead,
+        final boolean currentDirtyTree) {
+    List<String> problems = []
+        if (evidence.formatVersion != "j7m-phase7-evidence-v8") {
+            problems.add("stale format ${evidence.formatVersion}")
+        }
+    if (evidence.scope != "Phase 7.0-7.11 nugget operations final acceptance evidence") {
+        problems.add("stale scope ${evidence.scope}")
+    }
+    if (evidence.currentHead != currentHead) {
+        problems.add("stale HEAD")
+    }
+    Map<String, Long> evidenceTotals = phase7GeneratedEvidenceTotals(evidence)
+    Map<String, Long> currentTotals = phase7GeneratedEvidenceTotals([tests: currentSummary.counts])
+    if (evidenceTotals == null || currentTotals == null || !phase7EvidenceTotalsEqual(evidenceTotals, currentTotals)) {
+        problems.add("JUnit semantic totals changed")
+    }
+    if (!phase7RequiredSuitesPass(currentSummary, phase7RequiredSuites())) {
+        problems.add("required suites are not passing")
+    }
+    Map<String, Object> categories = evidence.categories as Map<String, Object>
+    if (categories == null) {
+        problems.add("missing categories")
+    } else {
+        if (categories.phase711DeferredFeatures != null) {
+            problems.add("obsolete Phase 7.11 deferred marker present")
+        }
+        String expectedFinalAcceptance = currentDirtyTree ? "NOT_RELEASE_READY_DIRTY_TREE" : "PASS"
+        if (!phase7ExecutableCategoriesPass(currentCategories)) {
+            expectedFinalAcceptance = "FAILED"
+        }
+        if (categories.phase711FinalAcceptance != expectedFinalAcceptance) {
+            problems.add("Phase 7.11 final acceptance state is ${categories.phase711FinalAcceptance}")
+        }
+        if (!phase7ExecutableCategoriesPass(categories)) {
+            problems.add("executable category failed")
+        }
+        if (categories != currentCategories) {
+            problems.add("category statuses changed")
+        }
+    }
+    if (evidence.validationState != "PASS") {
+        problems.add("validation state is ${evidence.validationState}")
+    }
+    if (!phase7GeneratedReleaseStatePass(evidence, currentDirtyTree)) {
+        problems.add("release state does not match current dirty-tree state")
+    }
+    return problems
+}
+
+static boolean phase7CurrentSemanticSelfCheck() {
+    Map<String, Object> currentSummary = [
+            counts: [tests: 279, failures: 0, errors: 0, skipped: 0, suites: 11],
+            suites: [:],
+            malformed: false
+    ]
+    phase7RequiredSuites().each { String suite ->
+        (currentSummary.suites as Map<String, Object>)["org.j7m.middleware.tests.${suite}"] = [
+                tests: 1, failures: 0, errors: 0, skipped: 0, pass: true]
+    }
+    Map<String, String> currentCategories = [
+            operatorGuidance: "GUIDANCE_ONLY",
+            gradleTaskOutcomes: "PASS",
+            junitEvidence: "PASS",
+            pinSecurity: "PASS",
+            discovery: "PASS",
+            introspectionRedaction: "PASS",
+            phase75Inspection: "PASS",
+            phase76ApplicationLifecycle: "PASS",
+            phase77ShutdownControls: "PASS",
+            adminApiContract: "PASS",
+            jsonContractSchema: "PASS",
+            cliPublicContractEquivalence: "PASS",
+            noWebDependency: "PASS",
+            resourceMapping: "PASS",
+            phase79SecurityHardening: "PASS",
+            phase710DemosExamplesDocs: "PASS",
+            cli: "PASS",
+            demo: "PASS",
+            architectureStaticPolicy: "PASS",
+            zeroSkippedRequiredTests: "PASS",
+            phase711FinalAcceptance: "NOT_RELEASE_READY_DIRTY_TREE"
+    ]
+    Map<String, Object> evidence = [
+            formatVersion: "j7m-phase7-evidence-v8",
+            scope: "Phase 7.0-7.11 nugget operations final acceptance evidence",
+            currentHead: "head-a",
+            tests: [tests: 279, failures: 0, errors: 0, skipped: 0, suites: 11],
+            categories: currentCategories,
+            validationState: "PASS",
+            dirtyWorkingTree: true,
+            releaseState: "TECHNICAL_PASS_DIRTY_TREE_RELEASE_SEAL_REQUIRES_OWNER_COMMIT",
+            releaseRecommendation: "DO_NOT_RELEASE_FROM_UNCOMMITTED_CURRENT_RUN_EVIDENCE"
+    ]
+    Map<String, Object> changedTests = new LinkedHashMap<String, Object>(evidence)
+    changedTests.tests = [tests: 278, failures: 0, errors: 0, skipped: 0, suites: 11]
+    Map<String, Object> changedFailures = new LinkedHashMap<String, Object>(evidence)
+    changedFailures.tests = [tests: 279, failures: 1, errors: 0, skipped: 0, suites: 11]
+    Map<String, Object> changedErrors = new LinkedHashMap<String, Object>(evidence)
+    changedErrors.tests = [tests: 279, failures: 0, errors: 1, skipped: 0, suites: 11]
+    Map<String, Object> changedSkipped = new LinkedHashMap<String, Object>(evidence)
+    changedSkipped.tests = [tests: 279, failures: 0, errors: 0, skipped: 1, suites: 11]
+    Map<String, Object> changedScope = new LinkedHashMap<String, Object>(evidence)
+    changedScope.scope = "Phase 7.0-7.10 nugget operations current-run evidence"
+    Map<String, Object> changedFinalAcceptance = new LinkedHashMap<String, Object>(evidence)
+    Map<String, String> changedFinalAcceptanceCategories = new LinkedHashMap<String, String>(currentCategories)
+    changedFinalAcceptanceCategories.phase711FinalAcceptance = "PASS"
+    changedFinalAcceptance.categories = changedFinalAcceptanceCategories
+    Map<String, Object> obsoleteDeferred = new LinkedHashMap<String, Object>(evidence)
+    Map<String, String> obsoleteDeferredCategories = new LinkedHashMap<String, String>(currentCategories)
+    obsoleteDeferredCategories.remove("phase711FinalAcceptance")
+    obsoleteDeferredCategories.phase711DeferredFeatures = "DEFERRED_NOT_ACCEPTED"
+    obsoleteDeferred.categories = obsoleteDeferredCategories
+    Map<String, Object> dirtyEvidenceClaimingCleanRelease = new LinkedHashMap<String, Object>(evidence)
+    dirtyEvidenceClaimingCleanRelease.dirtyWorkingTree = false
+    dirtyEvidenceClaimingCleanRelease.releaseState = "TECHNICAL_PASS_CLEAN_TREE_OWNER_MAY_SEAL"
+    dirtyEvidenceClaimingCleanRelease.releaseRecommendation = "OWNER_MAY_RELEASE_AFTER_REVIEW"
+    Map<String, Object> cleanReleaseEvidence = new LinkedHashMap<String, Object>(evidence)
+    Map<String, String> cleanReleaseCategories = new LinkedHashMap<String, String>(currentCategories)
+    cleanReleaseCategories.phase711FinalAcceptance = "PASS"
+    cleanReleaseEvidence.categories = cleanReleaseCategories
+    cleanReleaseEvidence.dirtyWorkingTree = false
+    cleanReleaseEvidence.releaseState = "PHASE7_RELEASE_ACCEPTED"
+    cleanReleaseEvidence.releaseRecommendation = "ACCEPT_PHASE7_RELEASE"
+    return phase7CurrentSemanticProblems(evidence, currentSummary, currentCategories, "head-a", true).isEmpty()
+            && phase7CurrentSemanticProblems(
+                    cleanReleaseEvidence,
+                    currentSummary,
+                    cleanReleaseCategories,
+                    "head-a",
+                    false).isEmpty()
+            && !phase7CurrentSemanticProblems(changedTests, currentSummary, currentCategories, "head-a", true).isEmpty()
+            && !phase7CurrentSemanticProblems(changedFailures, currentSummary, currentCategories, "head-a", true).isEmpty()
+            && !phase7CurrentSemanticProblems(changedErrors, currentSummary, currentCategories, "head-a", true).isEmpty()
+            && !phase7CurrentSemanticProblems(changedSkipped, currentSummary, currentCategories, "head-a", true).isEmpty()
+            && !phase7CurrentSemanticProblems(changedScope, currentSummary, currentCategories, "head-a", true).isEmpty()
+            && !phase7CurrentSemanticProblems(changedFinalAcceptance, currentSummary, currentCategories, "head-a", true).isEmpty()
+            && !phase7CurrentSemanticProblems(obsoleteDeferred, currentSummary, currentCategories, "head-a", true).isEmpty()
+            && !phase7CurrentSemanticProblems(dirtyEvidenceClaimingCleanRelease, currentSummary, currentCategories, "head-a", true).isEmpty()
+}
+
+static boolean phase7LedgerDirtyNonReleaseStatePass(final String ledger) {
+    String marker = ("- Stable Phase 7 dirty-tree non-release marker: dirtyWorkingTree=true "
+            + "releaseState=TECHNICAL_PASS_DIRTY_TREE_RELEASE_SEAL_REQUIRES_OWNER_COMMIT "
+            + "releaseRecommendation=DO_NOT_RELEASE_FROM_UNCOMMITTED_CURRENT_RUN_EVIDENCE.")
+    java.util.regex.Matcher markerMatcher = java.util.regex.Pattern
+            .compile("(?m)^" + java.util.regex.Pattern.quote(marker) + "\$")
+            .matcher(ledger)
+    int markerCount = 0
+    while (markerMatcher.find()) {
+        markerCount = markerCount + 1
+        if (markerCount > 1) {
+            return false
+        }
+    }
+    return markerCount == 1
+}
+
+static Map<String, Long> phase7GeneratedEvidenceTotals(final Map<String, Object> evidence) {
+    if (evidence == null) {
+        return null
+    }
+    Map<String, Object> tests = evidence.tests as Map<String, Object>
+    if (tests == null) {
+        return null
+    }
+    Long testCount = phase7EvidenceNonNegativeLong(tests.tests)
+    Long failures = phase7EvidenceNonNegativeLong(tests.failures)
+    Long errors = phase7EvidenceNonNegativeLong(tests.errors)
+    Long skipped = phase7EvidenceNonNegativeLong(tests.skipped)
+    if (testCount == null || failures == null || errors == null || skipped == null) {
+        return null
+    }
+    return [tests: testCount, failures: failures, errors: errors, skipped: skipped]
+}
+
+static Map<String, Long> phase7LedgerStableEvidenceTotals(final String ledger) {
+    java.util.regex.Matcher prefixMatcher = java.util.regex.Pattern
+            .compile("(?m)^- Stable Phase 7 evidence totals marker:")
+            .matcher(ledger)
+    int prefixCount = 0
+    while (prefixMatcher.find()) {
+        prefixCount = prefixCount + 1
+        if (prefixCount > 1) {
+            return null
+        }
+    }
+    if (prefixCount != 1) {
+        return null
+    }
+
+    java.util.regex.Matcher markerMatcher = java.util.regex.Pattern
+            .compile("(?m)^- Stable Phase 7 evidence totals marker: tests=(0|[1-9][0-9]*) failures=(0|[1-9][0-9]*) errors=(0|[1-9][0-9]*) skipped=(0|[1-9][0-9]*)\\.\$")
+            .matcher(ledger)
+    if (!markerMatcher.find()) {
+        return null
+    }
+    Long testCount = phase7ParseStableEvidenceTotal(markerMatcher.group(1))
+    Long failures = phase7ParseStableEvidenceTotal(markerMatcher.group(2))
+    Long errors = phase7ParseStableEvidenceTotal(markerMatcher.group(3))
+    Long skipped = phase7ParseStableEvidenceTotal(markerMatcher.group(4))
+    if (testCount == null || failures == null || errors == null || skipped == null || markerMatcher.find()) {
+        return null
+    }
+    return [tests: testCount, failures: failures, errors: errors, skipped: skipped]
+}
+
+static Long phase7EvidenceNonNegativeLong(final Object value) {
+    if (!(value instanceof Number)) {
+        return null
+    }
+    if (value instanceof java.math.BigInteger) {
+        java.math.BigInteger integerValue = value as java.math.BigInteger
+        if (integerValue.signum() < 0 || integerValue.compareTo(java.math.BigInteger.valueOf(Long.MAX_VALUE)) > 0) {
+            return null
+        }
+        return integerValue.longValue()
+    }
+    if (value instanceof java.math.BigDecimal) {
+        try {
+            return phase7EvidenceNonNegativeLong(((java.math.BigDecimal) value).toBigIntegerExact())
+        } catch (ArithmeticException ignored) {
+            return null
+        }
+    }
+    if (value instanceof Double || value instanceof Float) {
+        double doubleValue = ((Number) value).doubleValue()
+        if (!Double.isFinite(doubleValue) || Math.rint(doubleValue) != doubleValue
+                || doubleValue < 0.0d || doubleValue > Long.MAX_VALUE) {
+            return null
+        }
+        return (long) doubleValue
+    }
+    long longValue = ((Number) value).longValue()
+    return longValue < 0L ? null : longValue
+}
+
+static Long phase7ParseStableEvidenceTotal(final String value) {
+    try {
+        long parsed = Long.parseLong(value)
+        return parsed < 0L ? null : parsed
+    } catch (NumberFormatException ignored) {
+        return null
+    }
+}
+
+static boolean phase7EvidenceTotalsEqual(final Map<String, Long> first, final Map<String, Long> second) {
+    return first.tests == second.tests
+            && first.failures == second.failures
+            && first.errors == second.errors
+            && first.skipped == second.skipped
+}
+
+static boolean phase7LedgerMismatchSelfCheck() {
+    Map<String, Object> evidence = [
+            scope: "Phase 7.0-7.11 nugget operations final acceptance evidence",
+            tests: [tests: 279, failures: 0, errors: 0, skipped: 0],
+            categories: [phase711FinalAcceptance: "NOT_RELEASE_READY_DIRTY_TREE"],
+            dirtyWorkingTree: true,
+            releaseState: "TECHNICAL_PASS_DIRTY_TREE_RELEASE_SEAL_REQUIRES_OWNER_COMMIT",
+            releaseRecommendation: "DO_NOT_RELEASE_FROM_UNCOMMITTED_CURRENT_RUN_EVIDENCE",
+            currentRunIdentity: "identity-a"
+    ]
+    String marker = "- Stable Phase 7 evidence totals marker: tests=279 failures=0 errors=0 skipped=0.\n"
+    String matching = ("**Status:** IMPLEMENTED_READY_FOR_OWNER_COMMIT_AND_FINAL_PHASE7_11_REVIEW.\n"
+            + "Scope: Phase 7.0-7.11 nugget operations final acceptance evidence.\n"
+            + marker
+            + "Evidence stable contract: generated reports must validate with 0 failures, 0 errors, "
+            + "0 skipped tests, stable scope, current HEAD, required suite/category status, "
+            + "and a `phase711FinalAcceptance` state of `NOT_RELEASE_READY_DIRTY_TREE`, `PASS`, or `FAILED`.\n"
+            + "Generated evidence excludes volatile `generatedAt` and obsolete "
+            + "`junitArtifacts`/`demoArtifacts` fields from stable acceptance checks.\n")
+    Map<String, Object> cleanReleaseEvidence = new LinkedHashMap<String, Object>(evidence)
+    Map<String, String> cleanReleaseCategories = new LinkedHashMap<String, String>(evidence.categories as Map<String, String>)
+    cleanReleaseCategories.phase711FinalAcceptance = "PASS"
+    cleanReleaseEvidence.categories = cleanReleaseCategories
+    cleanReleaseEvidence.dirtyWorkingTree = false
+    cleanReleaseEvidence.releaseState = "PHASE7_RELEASE_ACCEPTED"
+    cleanReleaseEvidence.releaseRecommendation = "ACCEPT_PHASE7_RELEASE"
+    String staleTests = matching.replace(marker,
+            "- Stable Phase 7 evidence totals marker: tests=278 failures=0 errors=0 skipped=0.\n")
+    String staleFailures = matching.replace(marker,
+            "- Stable Phase 7 evidence totals marker: tests=279 failures=1 errors=0 skipped=0.\n")
+    String staleErrors = matching.replace(marker,
+            "- Stable Phase 7 evidence totals marker: tests=279 failures=0 errors=1 skipped=0.\n")
+    String staleSkips = matching.replace(marker,
+            "- Stable Phase 7 evidence totals marker: tests=279 failures=0 errors=0 skipped=1.\n")
+    String missingMarker = matching.replace(marker, "")
+    String malformedMarker = matching.replace(marker,
+            "- Stable Phase 7 evidence totals marker: tests=-279 failures=0 errors=0 skipped=0.\n")
+    String duplicateMarker = matching + marker
+    String overflowMarker = matching.replace(marker,
+            "- Stable Phase 7 evidence totals marker: tests=9223372036854775808 failures=0 errors=0 skipped=0.\n")
+    String staleIdentity = matching + "Evidence current-run identity:\n`identity-b`.\n"
+    String missingFinalState = matching.replace("phase711FinalAcceptance", "phase711DeferredFeatures")
+    String obsoleteDeferred = matching + "phase711DeferredFeatures=DEFERRED_NOT_ACCEPTED.\n"
+    return phase7LedgerTextMatchesEvidence(matching, evidence)
+            && phase7LedgerTextMatchesEvidence(matching, cleanReleaseEvidence)
+            && !phase7LedgerTextMatchesEvidence(staleTests, evidence)
+            && !phase7LedgerTextMatchesEvidence(staleFailures, evidence)
+            && !phase7LedgerTextMatchesEvidence(staleErrors, evidence)
+            && !phase7LedgerTextMatchesEvidence(staleSkips, evidence)
+            && !phase7LedgerTextMatchesEvidence(missingMarker, evidence)
+            && !phase7LedgerTextMatchesEvidence(malformedMarker, evidence)
+            && !phase7LedgerTextMatchesEvidence(duplicateMarker, evidence)
+            && !phase7LedgerTextMatchesEvidence(overflowMarker, evidence)
+            && !phase7LedgerTextMatchesEvidence(staleIdentity, evidence)
+            && !phase7LedgerTextMatchesEvidence(missingFinalState, evidence)
+            && !phase7LedgerTextMatchesEvidence(obsoleteDeferred, evidence)
+}
+
+static boolean phase7ExecutableCategoriesPass(final Map<String, Object> categories) {
+    return categories.every { Map.Entry<String, Object> entry ->
+        if (entry.key == "operatorGuidance") {
+            return entry.value == "GUIDANCE_ONLY"
+        }
+        if (entry.key == "phase711FinalAcceptance") {
+            return entry.value == "PASS" || entry.value == "NOT_RELEASE_READY_DIRTY_TREE"
+        }
+        return entry.value == "PASS"
+    }
+}
+
+static boolean phase7DirtyWorkingTree(final File root) {
+    Process gitStatusProcess = new ProcessBuilder("git", "status", "--short")
+            .directory(root)
+            .redirectErrorStream(true)
+            .start()
+    String gitStatus = gitStatusProcess.inputStream.getText("UTF-8")
+    int exit = gitStatusProcess.waitFor()
+    return exit == 0 && !gitStatus.trim().isEmpty()
+}
+
+static String phase7RunIdentity(final List<File> resultDirectories, final File phase7Directory, final File root) {
+    java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256")
+    resultDirectories.each { File resultDirectory ->
+        phase7UpdateDigestWithFiles(digest, resultDirectory)
+    }
+    phase7UpdateDigestWithFiles(digest, phase7Directory)
+    phase7UpdateDigest(digest, new File(root, "documentation/docs/reference/admin-api.md"))
+    return phase7Hex(digest.digest())
+}
+
+static void phase7UpdateDigestWithFiles(final java.security.MessageDigest digest, final File directory) {
+    if (!directory.isDirectory()) {
+        phase7UpdateDigestText(digest, "missing:" + directory.name)
+        return
+    }
+    List<File> files = phase7BoundedDigestFiles(directory, phase7MaxXmlFilesPerDirectory())
+    if (files == null) {
+        phase7UpdateDigestText(digest, "invalid:" + directory.name)
+        return
+    }
+    files.each { File file -> phase7UpdateDigest(digest, file) }
+}
+
+static void phase7UpdateDigest(final java.security.MessageDigest digest, final File file) {
+    phase7UpdateDigestText(digest, file.name)
+    if (file.isFile()) {
+        int maxBytes = file.name.endsWith(".out") ? phase7MaxDemoBytes() : phase7MaxXmlBytes()
+        byte[] bytes = phase7ReadBoundedBytes(file, maxBytes)
+        if (bytes == null) {
+            phase7UpdateDigestText(digest, "invalid:" + file.name)
+            return
+        }
+        digest.update(bytes)
+    }
+}
+
+static void phase7UpdateDigestText(final java.security.MessageDigest digest, final String text) {
+    digest.update(text.getBytes("UTF-8"))
+}
+
+static String phase7Hex(final byte[] bytes) {
+    char[] alphabet = "0123456789abcdef".toCharArray()
+    char[] chars = new char[bytes.length * 2]
+    for (int index = 0; index < bytes.length; index++) {
+        int value = bytes[index] & 0xff
+        chars[index * 2] = alphabet[value >>> 4]
+        chars[(index * 2) + 1] = alphabet[value & 0x0f]
+    }
+    return new String(chars)
+}
+
+static String phase7EvidenceMarkdown(final Map<String, Object> evidence) {
+    List<String> lines = ["# Phase 7.0-7.11 Nugget Operations Evidence", ""]
+    lines.addAll(phase7EvidenceMarkdownLines(evidence))
+    lines.add("")
+    if (evidence.categories?.phase711FinalAcceptance == "PASS") {
+        lines.add("This evidence is deterministic final Phase 7.11 release acceptance output for the current clean tree.")
+    } else {
+        lines.add("This evidence is deterministic Phase 7.11 validation output for the current dirty tree. It is a non-release preview.")
+    }
+    lines.add("Script mode, remote transport, web/API adapter, browser authentication, and deep invocation drain gating remain deferred beyond Phase 7.")
+    return lines.join("\n") + "\n"
+}
+
+static List<String> phase7EvidenceMarkdownLines(final Map<String, Object> evidence) {
+    Map<String, Object> tests = evidence.tests as Map<String, Object>
+    Map<String, Object> categories = evidence.categories as Map<String, Object>
+    List<String> lines = [
+            "- Format version: `${evidence.formatVersion}`",
+            "- Scope: `${evidence.scope}`",
+            "- Generated at: `${evidence.generatedAt}`",
+            "- Current HEAD: `${evidence.currentHead}`",
+            "- Current-run identity: `${evidence.currentRunIdentity}`",
+            "- Test suites: `${tests.suites}`",
+            "- Tests: `${tests.tests}`",
+            "- Failures: `${tests.failures}`",
+            "- Errors: `${tests.errors}`",
+            "- Skipped: `${tests.skipped}`"
+    ]
+    categories.keySet().sort().each { String key ->
+        lines.add("- ${key}: `${categories[key]}`")
+    }
+    lines.add("- Validation state: `${evidence.validationState}`")
+    lines.add("- Dirty working tree: `${evidence.dirtyWorkingTree}`")
+    lines.add("- Release state: `${evidence.releaseState}`")
+    lines.add("- Release recommendation: `${evidence.releaseRecommendation}`")
+    return lines
+}
+
+tasks.register("phase5ApplicationPlatformTest", Test) {
+    group = "verification"
+    description = "Runs the historical Phase 5 application-platform acceptance slice without Phase 7 operations-plane tests."
+    configureJ7mTestsTask(delegate)
+    filter {
+        includeTestsMatching "org.j7m.middleware.tests.ApplicationPlatformVerticalSliceTest"
+        includeTestsMatching "org.j7m.middleware.tests.Phase41StreamingWorkloadFidelityTest"
+        includeTestsMatching "org.j7m.middleware.tests.Phase4WorkloadIntegrationTest"
+        includeTestsMatching "org.j7m.middleware.tests.Phase51EnterpriseReadinessAuditTest"
+        includeTestsMatching "org.j7m.middleware.tests.Phase52JpmsAndUpgradeTest"
+        includeTestsMatching "org.j7m.middleware.tests.Phase52JpmsDescriptorClosureTest"
+        includeTestsMatching "org.j7m.middleware.tests.Phase53SecurityRepositoryHardeningTest"
+        includeTestsMatching "org.j7m.middleware.tests.Phase54LifecycleUpgradeAdminClosureTest"
+        includeTestsMatching "org.j7m.middleware.tests.Phase55DeveloperExperienceTest"
+        includeTestsMatching "org.j7m.middleware.tests.Phase55RequiredExamplesClosureTest"
+        includeTestsMatching "org.j7m.middleware.tests.Phase56ApplicationPlatformAcceptanceTest"
+        includeTestsMatching "org.j7m.middleware.tests.Phase5RegulatedEnterpriseReadinessTest"
+    }
+}
+
+tasks.register("phase6ReliabilitySemanticsTest", Test) {
+    group = "verification"
+    description = "Runs the Phase 6.1 reliability semantics slice without Phase 7 operations-plane tests."
+    configureJ7mTestsTask(delegate)
+    filter {
+        includeTestsMatching "org.j7m.middleware.tests.BackpressurePolicyTest"
+        includeTestsMatching "org.j7m.middleware.tests.CausalContextTest"
+        includeTestsMatching "org.j7m.middleware.tests.CorrelationContextTest"
+        includeTestsMatching "org.j7m.middleware.tests.DedupeKeyTest"
+        includeTestsMatching "org.j7m.middleware.tests.DeliverySemanticsTest"
+        includeTestsMatching "org.j7m.middleware.tests.FencingTokenTest"
+        includeTestsMatching "org.j7m.middleware.tests.IdempotencyKeyTest"
+        includeTestsMatching "org.j7m.middleware.tests.InvocationReliabilityMetadataTest"
+        includeTestsMatching "org.j7m.middleware.tests.ReliabilityAdminStatusTest"
+        includeTestsMatching "org.j7m.middleware.tests.ReliabilityRegressionTest"
+        includeTestsMatching "org.j7m.middleware.tests.ReliabilityTransportRoundTripTest"
+        includeTestsMatching "org.j7m.middleware.tests.RetrySafetyResolverTest"
+    }
+}
+
+tasks.register("validateNuggetAdmin", Test) {
+    group = "verification"
+    description = "Runs the focused Phase 7.0-7.10 nugget admin/runtime ownership tests."
+    configureJ7mTestsTask(delegate)
+    outputs.upToDateWhen { false }
+    filter {
+        includeTestsMatching "org.j7m.middleware.tests.NuggetAdminStartupTest"
+        includeTestsMatching "org.j7m.middleware.operations.runtime.NuggetAdminInternalCoverageTest"
+    }
+}
+
+tasks.register("validateNuggetSecurity", Test) {
+    group = "verification"
+    description = "Runs the focused Phase 7.0-7.10 nugget PIN security and audit tests."
+    configureJ7mTestsTask(delegate)
+    outputs.upToDateWhen { false }
+    filter {
+        includeTestsMatching "org.j7m.middleware.tests.NuggetPinAuthTest"
+        includeTestsMatching "org.j7m.middleware.tests.NuggetAuditSecurityTest"
+    }
+}
+
+tasks.register("validateNuggetDiscovery", Test) {
+    group = "verification"
+    description = "Runs the focused Phase 7.0-7.10 nugget discovery tests."
+    configureJ7mTestsTask(delegate)
+    outputs.upToDateWhen { false }
+    filter {
+        includeTestsMatching "org.j7m.middleware.tests.NuggetDiscoveryTest"
+    }
+}
+
+tasks.register("validateNuggetIntrospectionRedaction", Test) {
+    group = "verification"
+    description = "Runs the focused Phase 7.0-7.10 nugget introspection and redaction tests."
+    configureJ7mTestsTask(delegate)
+    outputs.upToDateWhen { false }
+    filter {
+        includeTestsMatching "org.j7m.middleware.tests.NuggetIntrospectionTest"
+    }
+}
+
+tasks.register("validateNuggetInspection", Test) {
+    group = "verification"
+    description = "Runs the focused Phase 7.5 nugget inspection query, redaction, and bounds tests."
+    configureJ7mTestsTask(delegate)
+    outputs.upToDateWhen { false }
+    filter {
+        includeTestsMatching "org.j7m.middleware.tests.NuggetIntrospectionTest"
+    }
+}
+
+tasks.register("validateNuggetApplicationLifecycle", Test) {
+    group = "verification"
+    description = "Runs the focused Phase 7.6 nugget application lifecycle tests."
+    configureJ7mTestsTask(delegate)
+    outputs.upToDateWhen { false }
+    filter {
+        includeTestsMatching "org.j7m.middleware.tests.NuggetApplicationLifecycleTest"
+    }
+}
+
+tasks.register("validateNuggetShutdownControls", Test) {
+    group = "verification"
+    description = "Runs the focused Phase 7.7 nugget shutdown and kill control tests."
+    configureJ7mTestsTask(delegate)
+    outputs.upToDateWhen { false }
+    filter {
+        includeTestsMatching "org.j7m.middleware.tests.NuggetShutdownControlTest"
+    }
+}
+
+tasks.register("validateNuggetAdminApiContract", Test) {
+    group = "verification"
+    description = "Runs the focused Phase 7.8 nugget admin API contract, JSON schema, CLI equivalence, and no-web-boundary tests."
+    configureJ7mTestsTask(delegate)
+    outputs.upToDateWhen { false }
+    filter {
+        includeTestsMatching "org.j7m.middleware.tests.NuggetAdminApiContractTest"
+    }
+}
+
+tasks.register("validateNuggetPublicApiBoundary", Test) {
+    group = "verification"
+    description = "Runs the focused Phase 7.0-7.10 documentation and public API boundary sentinel."
+    configureJ7mTestsTask(delegate)
+    outputs.upToDateWhen { false }
+    filter {
+        includeTestsMatching "org.j7m.middleware.tests.NuggetPhase7DocumentationConsistencyTest"
+    }
+}
+
+tasks.register("phase7NuggetAdminDemoEvidence", JavaExec) {
+    group = "verification"
+    description = "Runs and captures the deterministic Phase 7.0-7.10 nugget admin demo."
+    dependsOn ":j7m-demo:classes"
+    classpath = project(":j7m-demo").sourceSets.main.runtimeClasspath
+    mainClass = "org.j7m.middleware.demo.operations.NuggetOperationsDemo"
+    args "admin"
+    outputs.file rootProject.layout.buildDirectory.file("reports/j7m/phase7/nugget-admin-demo.out")
+    outputs.upToDateWhen { false }
+    java.io.ByteArrayOutputStream capturedOutput = new java.io.ByteArrayOutputStream(4096)
+    standardOutput = capturedOutput
+    errorOutput = capturedOutput
+    doFirst {
+        capturedOutput.reset()
+    }
+    doLast {
+        File output = rootProject.layout.buildDirectory.file("reports/j7m/phase7/nugget-admin-demo.out").get().asFile
+        output.parentFile.mkdirs()
+        output.setText(capturedOutput.toString("UTF-8"), "UTF-8")
+    }
+}
+
+tasks.register("phase7NuggetCliDemoEvidence", JavaExec) {
+    group = "verification"
+    description = "Runs and captures the deterministic Phase 7.0-7.10 nugget CLI demo."
+    dependsOn ":j7m-demo:classes"
+    classpath = project(":j7m-demo").sourceSets.main.runtimeClasspath
+    mainClass = "org.j7m.middleware.demo.operations.NuggetOperationsDemo"
+    args "cli"
+    outputs.file rootProject.layout.buildDirectory.file("reports/j7m/phase7/nugget-cli-demo.out")
+    outputs.upToDateWhen { false }
+    java.io.ByteArrayOutputStream capturedOutput = new java.io.ByteArrayOutputStream(4096)
+    standardOutput = capturedOutput
+    errorOutput = capturedOutput
+    doFirst {
+        capturedOutput.reset()
+    }
+    doLast {
+        File output = rootProject.layout.buildDirectory.file("reports/j7m/phase7/nugget-cli-demo.out").get().asFile
+        output.parentFile.mkdirs()
+        output.setText(capturedOutput.toString("UTF-8"), "UTF-8")
+    }
+}
+
+tasks.register("phase7NuggetCliApplicationLifecycleDemoEvidence", JavaExec) {
+    group = "verification"
+    description = "Runs and captures the deterministic Phase 7.6 nugget CLI application lifecycle demo."
+    dependsOn ":j7m-examples:jar"
+    dependsOn ":j7m-demo:classes"
+    classpath = project(":j7m-demo").sourceSets.main.runtimeClasspath
+    mainClass = "org.j7m.middleware.demo.operations.NuggetOperationsDemo"
+    args "cli-application-lifecycle"
+    outputs.file rootProject.layout.buildDirectory.file("reports/j7m/phase7/nugget-cli-application-lifecycle-demo.out")
+    outputs.upToDateWhen { false }
+    java.io.ByteArrayOutputStream capturedOutput = new java.io.ByteArrayOutputStream(4096)
+    standardOutput = capturedOutput
+    errorOutput = capturedOutput
+    doFirst {
+        capturedOutput.reset()
+    }
+    doLast {
+        File output = rootProject.layout.buildDirectory.file("reports/j7m/phase7/nugget-cli-application-lifecycle-demo.out").get().asFile
+        output.parentFile.mkdirs()
+        output.setText(capturedOutput.toString("UTF-8"), "UTF-8")
+    }
+}
+
+tasks.register("phase7NuggetPinFailureDemoEvidence", JavaExec) {
+    group = "verification"
+    description = "Runs and captures the deterministic Phase 7.0-7.10 nugget CLI PIN failure demo."
+    dependsOn ":j7m-demo:classes"
+    classpath = project(":j7m-demo").sourceSets.main.runtimeClasspath
+    mainClass = "org.j7m.middleware.demo.operations.NuggetOperationsDemo"
+    args "pin-failure"
+    outputs.file rootProject.layout.buildDirectory.file("reports/j7m/phase7/nugget-pin-failure-demo.out")
+    outputs.upToDateWhen { false }
+    java.io.ByteArrayOutputStream capturedOutput = new java.io.ByteArrayOutputStream(4096)
+    standardOutput = capturedOutput
+    errorOutput = capturedOutput
+    doFirst {
+        capturedOutput.reset()
+    }
+    doLast {
+        File output = rootProject.layout.buildDirectory.file("reports/j7m/phase7/nugget-pin-failure-demo.out").get().asFile
+        output.parentFile.mkdirs()
+        output.setText(capturedOutput.toString("UTF-8"), "UTF-8")
+    }
+}
+
+tasks.register("phase7NuggetCliKillDisabledDemoEvidence", JavaExec) {
+    group = "verification"
+    description = "Runs and captures the deterministic Phase 7.7 nugget CLI shutdown and kill-disabled demo."
+    dependsOn ":j7m-demo:classes"
+    classpath = project(":j7m-demo").sourceSets.main.runtimeClasspath
+    mainClass = "org.j7m.middleware.demo.operations.NuggetOperationsDemo"
+    args "cli-kill-disabled"
+    outputs.file rootProject.layout.buildDirectory.file("reports/j7m/phase7/nugget-cli-kill-disabled-demo.out")
+    outputs.upToDateWhen { false }
+    java.io.ByteArrayOutputStream capturedOutput = new java.io.ByteArrayOutputStream(4096)
+    standardOutput = capturedOutput
+    errorOutput = capturedOutput
+    doFirst {
+        capturedOutput.reset()
+    }
+    doLast {
+        File output = rootProject.layout.buildDirectory.file("reports/j7m/phase7/nugget-cli-kill-disabled-demo.out").get().asFile
+        output.parentFile.mkdirs()
+        output.setText(capturedOutput.toString("UTF-8"), "UTF-8")
+    }
+}
+
+tasks.register("validateNuggetNoSkippedTests") {
+    group = "verification"
+    description = "Fails when any required Phase 7.0-7.10 nugget test is skipped, disabled, conditionally excluded, failed, errored, malformed, or missing."
+    dependsOn tasks.named("validateNuggetAdmin")
+    dependsOn tasks.named("validateNuggetSecurity")
+    dependsOn tasks.named("validateNuggetDiscovery")
+    dependsOn tasks.named("validateNuggetIntrospectionRedaction")
+    dependsOn tasks.named("validateNuggetInspection")
+    dependsOn tasks.named("validateNuggetApplicationLifecycle")
+    dependsOn tasks.named("validateNuggetShutdownControls")
+    dependsOn tasks.named("validateNuggetAdminApiContract")
+    dependsOn tasks.named("validateNuggetPublicApiBoundary")
+    dependsOn ":j7m-deployer-cli:validateJ7mCliConsole"
+    outputs.upToDateWhen { false }
+    doLast {
+        Map<String, Object> summary = phase7EvidenceSummary(phase7ResultDirectories(project, rootProject))
+        if (!phase7RequiredSuitesPass(summary, phase7RequiredSuites())) {
+            throw new GradleException("Required Phase 7.0-7.10 nugget tests are missing, malformed, failed, errored, or skipped")
+        }
+    }
+}
+
+tasks.register("validateNuggetOperations") {
+    group = "verification"
+    description = "Runs the focused aggregate Phase 7.0-7.10 nugget operations validation slice."
+    dependsOn tasks.named("validateNuggetAdmin")
+    dependsOn tasks.named("validateNuggetSecurity")
+    dependsOn tasks.named("validateNuggetDiscovery")
+    dependsOn tasks.named("validateNuggetIntrospectionRedaction")
+    dependsOn tasks.named("validateNuggetInspection")
+    dependsOn tasks.named("validateNuggetApplicationLifecycle")
+    dependsOn tasks.named("validateNuggetShutdownControls")
+    dependsOn tasks.named("validateNuggetAdminApiContract")
+    dependsOn tasks.named("validateNuggetPublicApiBoundary")
+    dependsOn tasks.named("validateNuggetNoSkippedTests")
+    dependsOn ":j7m-deployer-cli:validateJ7mCliConsole"
+    dependsOn ":validateNuggetExamples"
+    dependsOn ":validateNuggetDocs"
+    outputs.upToDateWhen { false }
+    doLast {
+        Map<String, Object> summary = phase7EvidenceSummary(phase7ResultDirectories(project, rootProject))
+        if (!phase7RequiredSuitesPass(summary, phase7RequiredSuites())) {
+            throw new GradleException("Phase 7.0-7.10 nugget operations aggregate validation failed")
+        }
+    }
+}
+
+tasks.register("generatePhase7AcceptanceReport") {
+    group = "verification"
+    description = "Generates deterministic Phase 7.0-7.11 nugget operations final acceptance evidence from tests, demos, and validators."
+    dependsOn tasks.named("validateNuggetOperations")
+    dependsOn tasks.named("phase7NuggetAdminDemoEvidence")
+    dependsOn tasks.named("phase7NuggetCliDemoEvidence")
+    dependsOn tasks.named("phase7NuggetCliApplicationLifecycleDemoEvidence")
+    dependsOn tasks.named("phase7NuggetPinFailureDemoEvidence")
+    dependsOn tasks.named("phase7NuggetCliKillDisabledDemoEvidence")
+    outputs.file rootProject.layout.buildDirectory.file("reports/j7m/phase7/phase-7-acceptance.json")
+    outputs.file rootProject.layout.buildDirectory.file("reports/j7m/phase7/phase-7-acceptance.md")
+    outputs.upToDateWhen { false }
+    doLast {
+        File phase7Directory = rootProject.layout.buildDirectory.dir("reports/j7m/phase7").get().asFile
+        Map<String, Object> summary = phase7EvidenceSummary(phase7ResultDirectories(project, rootProject))
+        Map<String, Object> suites = summary.suites as Map<String, Object>
+        boolean requiredSuitesPass = phase7RequiredSuitesPass(summary, phase7RequiredSuites())
+        boolean demoPass = phase7DemoOutputPass(phase7Directory)
+        boolean documentationPass = phase7DocumentationPass(rootProject.projectDir)
+        boolean dirtyTree = phase7DirtyWorkingTree(rootProject.projectDir)
+        Map<String, String> categories = phase7AcceptanceCategories(
+                suites,
+                requiredSuitesPass,
+                demoPass,
+                documentationPass,
+                dirtyTree)
+        boolean executablePass = phase7ExecutableCategoriesPass(categories)
+        String validationState = executablePass ? "PASS" : "FAIL"
+        Map<String, Object> evidence = [
+                formatVersion: "j7m-phase7-evidence-v8",
+                scope: "Phase 7.0-7.11 nugget operations final acceptance evidence",
+                generatedAt: java.time.Instant.now().toString(),
+                currentHead: w7RunGit(rootProject.projectDir, ["rev-parse", "HEAD"]),
+                validationTasks: [
+                        ":j7m-tests:validateNuggetAdmin",
+                        ":j7m-tests:validateNuggetSecurity",
+                        ":j7m-tests:validateNuggetDiscovery",
+                        ":j7m-tests:validateNuggetIntrospectionRedaction",
+                        ":j7m-tests:validateNuggetInspection",
+                        ":j7m-tests:validateNuggetApplicationLifecycle",
+                        ":j7m-tests:validateNuggetShutdownControls",
+                        ":j7m-tests:validateNuggetAdminApiContract",
+                        ":j7m-deployer-cli:validateJ7mCliConsole",
+                        ":j7m-tests:validateNuggetPublicApiBoundary",
+                        ":j7m-tests:validateNuggetNoSkippedTests",
+                        ":validateNuggetExamples",
+                        ":validateNuggetDocs",
+                        ":j7m-tests:validateNuggetOperations"
+                ],
+                demoTasks: [
+                        ":j7m-demo:runNuggetAdminDemo",
+                        ":j7m-demo:runNuggetCliDemo",
+                        ":j7m-demo:runNuggetCliApplicationLifecycleDemo",
+                        ":j7m-demo:runNuggetCliKillDisabledDemo",
+                        ":j7m-demo:runNuggetCliPinFailureDemo"
+                ],
+                evidenceDemoTasks: [
+                        ":j7m-tests:phase7NuggetAdminDemoEvidence",
+                        ":j7m-tests:phase7NuggetCliDemoEvidence",
+                        ":j7m-tests:phase7NuggetCliApplicationLifecycleDemoEvidence",
+                        ":j7m-tests:phase7NuggetCliKillDisabledDemoEvidence",
+                        ":j7m-tests:phase7NuggetPinFailureDemoEvidence"
+                ],
+                tests: summary.counts,
+                requiredSuites: phase7RequiredSuites(),
+                categories: categories,
+                validationState: validationState,
+                dirtyWorkingTree: dirtyTree,
+                releaseState: dirtyTree
+                        ? "TECHNICAL_PASS_DIRTY_TREE_RELEASE_SEAL_REQUIRES_OWNER_COMMIT"
+                        : "PHASE7_RELEASE_ACCEPTED",
+                releaseRecommendation: dirtyTree
+                        ? "DO_NOT_RELEASE_FROM_UNCOMMITTED_CURRENT_RUN_EVIDENCE"
+                        : "ACCEPT_PHASE7_RELEASE"
+        ]
+        evidence.currentRunIdentity = phase7CurrentRunIdentity(evidence)
+        File jsonOutput = rootProject.layout.buildDirectory.file("reports/j7m/phase7/phase-7-acceptance.json").get().asFile
+        File markdownOutput = rootProject.layout.buildDirectory.file("reports/j7m/phase7/phase-7-acceptance.md").get().asFile
+        jsonOutput.parentFile.mkdirs()
+        jsonOutput.text = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(evidence)) + "\n"
+        markdownOutput.text = phase7EvidenceMarkdown(evidence)
+    }
+}
+
+tasks.register("validateGeneratedPhase7Acceptance") {
+    group = "verification"
+    description = "Validates existing deterministic Phase 7.0-7.11 nugget operations final acceptance evidence without regenerating it."
+    outputs.upToDateWhen { false }
+    doLast {
+        File evidenceFile = rootProject.layout.buildDirectory.file("reports/j7m/phase7/phase-7-acceptance.json").get().asFile
+        File markdownFile = rootProject.layout.buildDirectory.file("reports/j7m/phase7/phase-7-acceptance.md").get().asFile
+        if (!evidenceFile.isFile() || !markdownFile.isFile()) {
+            throw new GradleException("Phase 7 evidence is missing; run generatePhase7AcceptanceReport once before validation-only checks")
+        }
+        Map<String, Object> evidence = new groovy.json.JsonSlurper().parse(evidenceFile) as Map<String, Object>
+        String markdown = markdownFile.getText("UTF-8")
+        File phase7Directory = rootProject.layout.buildDirectory.dir("reports/j7m/phase7").get().asFile
+        Map<String, Object> currentSummary = phase7EvidenceSummary(phase7ResultDirectories(project, rootProject))
+        Map<String, Object> currentSuites = currentSummary.suites as Map<String, Object>
+        boolean currentRequiredSuitesPass = phase7RequiredSuitesPass(currentSummary, phase7RequiredSuites())
+        boolean currentDemoPass = phase7DemoOutputPass(phase7Directory)
+        boolean currentDocumentationPass = phase7DocumentationPass(rootProject.projectDir)
+        boolean currentDirtyTree = phase7DirtyWorkingTree(rootProject.projectDir)
+        Map<String, String> currentCategories = phase7AcceptanceCategories(
+                currentSuites,
+                currentRequiredSuitesPass,
+                currentDemoPass,
+                currentDocumentationPass,
+                currentDirtyTree)
+        List<String> semanticProblems = phase7CurrentSemanticProblems(
+                evidence,
+                currentSummary,
+                currentCategories,
+                w7RunGit(rootProject.projectDir, ["rev-parse", "HEAD"]),
+                currentDirtyTree)
+        if (!semanticProblems.isEmpty()) {
+            throw new GradleException("Phase 7 evidence semantic facts are stale or contradictory: ${semanticProblems}")
+        }
+        if (evidence.currentRunIdentity != phase7CurrentRunIdentity(evidence)) {
+            throw new GradleException("Phase 7 evidence current-run identity does not match report contents")
+        }
+        String identityLine = "- Current-run identity: `${evidence.currentRunIdentity}`"
+        if (!markdown.contains(identityLine)) {
+            throw new GradleException("Phase 7 Markdown current-run identity does not match JSON evidence")
+        }
+        if (!phase7CurrentRunIdentitySelfCheck()) {
+            throw new GradleException("Phase 7 current-run identity stability self-check failed")
+        }
+        if (!phase7CurrentSemanticSelfCheck()) {
+            throw new GradleException("Phase 7 current semantic evidence self-check failed")
+        }
+        phase7EvidenceMarkdownLines(evidence).each { String line ->
+            if (!markdown.contains(line)) {
+                throw new GradleException("Phase 7 Markdown evidence does not match JSON evidence for line: ${line}")
+            }
+        }
+        String rootPath = rootProject.projectDir.absolutePath
+        if (evidenceFile.getText("UTF-8").contains(rootPath) || markdown.contains(rootPath)) {
+            throw new GradleException("Phase 7 evidence must not contain absolute workspace paths")
+        }
+        if (!phase7DocumentationPass(rootProject.projectDir)) {
+            throw new GradleException("Phase 7 documentation consistency validation failed")
+        }
+        if (!phase7ReportEvidencePass(rootProject.projectDir, evidence)) {
+            throw new GradleException("Phase 7 Markdown report does not exactly match current generated JSON evidence")
+        }
+        if (!phase7LedgerMismatchSelfCheck()) {
+            throw new GradleException("Phase 7 ledger/evidence mismatch self-check did not fail closed")
+        }
+        File scratchRoot = rootProject.layout.buildDirectory.dir("tmp/phase7").get().asFile
+        if (!phase7MalformedSuiteSelfCheck(scratchRoot)) {
+            throw new GradleException("Phase 7 malformed JUnit XML self-check did not fail closed")
+        }
+    }
+}
+
+tasks.register("validatePhase7Acceptance") {
+    group = "verification"
+    description = "Generates then validates deterministic Phase 7.0-7.11 nugget operations final acceptance evidence."
+    dependsOn tasks.named("generatePhase7AcceptanceReport")
+    dependsOn tasks.named("validateGeneratedPhase7Acceptance")
+}
+
+tasks.named("validateGeneratedPhase7Acceptance").configure {
+    mustRunAfter tasks.named("generatePhase7AcceptanceReport")
+}
+
+tasks.register("generateWave7FinalAssuranceEvidence") {
+    group = "verification"
+    description = "Generates authoritative Wave 7 cross-phase final-assurance evidence from current Phase 1, Phase 5, Wave 5, Phase 6, and Phase 7 reports."
+    dependsOn tasks.named("validatePhase1Evidence")
+    dependsOn ":validateApplicationPlatform"
+    dependsOn ":validateSovereignReliability"
+    dependsOn tasks.named("validatePhase7Acceptance")
+    outputs.file rootProject.layout.buildDirectory.file("reports/j7m/wave7/wave7-final-assurance.json")
+    outputs.file rootProject.layout.buildDirectory.file("reports/j7m/wave7/wave7-final-assurance.md")
+    outputs.upToDateWhen { false }
+    doLast {
+        String currentHead = w7RunGit(rootProject.projectDir, ["rev-parse", "HEAD"])
+        boolean dirtyTree = phase7DirtyWorkingTree(rootProject.projectDir)
+        List<Map<String, Object>> subordinates = [
+                w7SubordinateEvidence("phase1", rootProject.projectDir,
+                        rootProject.layout.buildDirectory.file("reports/j7m/phase-1-evidence.json").get().asFile,
+                        rootProject.layout.buildDirectory.file("reports/j7m/phase-1-evidence.md").get().asFile,
+                        currentHead),
+                w7SubordinateEvidence("phase5", rootProject.projectDir,
+                        rootProject.layout.buildDirectory.file("reports/j7m/application-platform-acceptance.json").get().asFile,
+                        rootProject.layout.buildDirectory.file("reports/j7m/application-platform-acceptance.md").get().asFile,
+                        currentHead),
+                w7SubordinateEvidence("wave5", rootProject.projectDir,
+                        rootProject.layout.buildDirectory.file("reports/j7m/wave5-phase6-evidence.json").get().asFile,
+                        rootProject.layout.buildDirectory.file("reports/j7m/wave5-phase6-evidence.md").get().asFile,
+                        currentHead),
+                w7SubordinateEvidence("phase6", rootProject.projectDir,
+                        rootProject.layout.buildDirectory.file("reports/j7m/phase-6-acceptance-report.json").get().asFile,
+                        rootProject.layout.buildDirectory.file("reports/j7m/phase-6-acceptance-report.md").get().asFile,
+                        currentHead),
+                w7SubordinateEvidence("phase7", rootProject.projectDir,
+                        rootProject.layout.buildDirectory.file("reports/j7m/phase7/phase-7-acceptance.json").get().asFile,
+                        rootProject.layout.buildDirectory.file("reports/j7m/phase7/phase-7-acceptance.md").get().asFile,
+                        currentHead)
+        ]
+        boolean allPass = subordinates.every { Map<String, Object> row -> row.status == "PASS" }
+        Map<String, Object> evidence = [
+                formatVersion: "j7m-wave7-final-assurance-v1",
+                generatedAt: java.time.Instant.now().toString(),
+                currentHead: currentHead,
+                dirtyWorkingTree: dirtyTree,
+                technicalStatus: w7FinalTechnicalStatus(allPass),
+                releaseVerdict: w7FinalReleaseVerdict(allPass, dirtyTree),
+                validationTasks: [
+                        ":j7m-tests:validatePhase1Evidence",
+                        ":validateApplicationPlatform",
+                        ":validateSovereignReliability",
+                        ":j7m-tests:validatePhase7Acceptance",
+                        ":j7m-tests:validateWave7FinalAssuranceEvidence"
+                ],
+                subordinateEvidence: subordinates,
+                blockers: subordinates.collectMany { Map<String, Object> row -> row.blockers as List<Object> },
+                releaseRecommendation: allPass && !dirtyTree ? "OWNER_MAY_RELEASE_AFTER_REVIEW" : "DO_NOT_RELEASE"
+        ]
+        evidence.currentRunIdentity = w7MapIdentity(evidence)
+        File jsonOutput = rootProject.layout.buildDirectory.file("reports/j7m/wave7/wave7-final-assurance.json").get().asFile
+        File markdownOutput = rootProject.layout.buildDirectory.file("reports/j7m/wave7/wave7-final-assurance.md").get().asFile
+        jsonOutput.parentFile.mkdirs()
+        jsonOutput.text = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(evidence)) + "\n"
+        markdownOutput.text = w7FinalAssuranceMarkdown(evidence)
+    }
+}
+
+tasks.register("validateWave7FinalAssuranceEvidence") {
+    group = "verification"
+    description = "Validates authoritative Wave 7 final-assurance evidence and rejects stale, contradictory, blocked, or guidance-only subordinate evidence."
+    dependsOn tasks.named("generateWave7FinalAssuranceEvidence")
+    outputs.upToDateWhen { false }
+    doLast {
+        File evidenceFile = rootProject.layout.buildDirectory.file("reports/j7m/wave7/wave7-final-assurance.json").get().asFile
+        File markdownFile = rootProject.layout.buildDirectory.file("reports/j7m/wave7/wave7-final-assurance.md").get().asFile
+        if (!evidenceFile.isFile() || !markdownFile.isFile()) {
+            throw new GradleException("Wave 7 final-assurance evidence is missing")
+        }
+        Map<String, Object> evidence = new groovy.json.JsonSlurper().parse(evidenceFile) as Map<String, Object>
+        String markdown = markdownFile.getText("UTF-8")
+        if (evidence.formatVersion != "j7m-wave7-final-assurance-v1") {
+            throw new GradleException("Wave 7 final-assurance evidence format is stale: ${evidence.formatVersion}")
+        }
+        if (evidence.currentHead != w7RunGit(rootProject.projectDir, ["rev-parse", "HEAD"])) {
+            throw new GradleException("Wave 7 final-assurance evidence was generated for a stale HEAD")
+        }
+        if (evidence.currentRunIdentity != w7MapIdentity(evidence.findAll { Map.Entry<String, Object> entry ->
+            entry.key != "currentRunIdentity"
+        } as Map<String, Object>)) {
+            throw new GradleException("Wave 7 final-assurance current-run identity does not match report contents")
+        }
+        if (evidence.technicalStatus != "TECHNICAL_PASS") {
+            throw new GradleException("Wave 7 final-assurance evidence is blocked: ${evidence.blockers}")
+        }
+        List<Object> subordinates = evidence.subordinateEvidence as List<Object>
+        if (subordinates == null || subordinates.size() != 5) {
+            throw new GradleException("Wave 7 final-assurance subordinate evidence set is incomplete")
+        }
+        subordinates.each { Object value ->
+            Map<String, Object> row = value as Map<String, Object>
+            if (row.status != "PASS" || !(row.blockers as List<Object>).isEmpty()) {
+                throw new GradleException("Wave 7 subordinate evidence is not passing: ${row}")
+            }
+            if (row.currentHead != evidence.currentHead) {
+                throw new GradleException("Wave 7 subordinate evidence HEAD mismatch: ${row}")
+            }
+            List<Map<String, Object>> problems = w7ValidateArtifacts(rootProject.projectDir, [row.jsonArtifact, row.markdownArtifact])
+            if (!problems.isEmpty()) {
+                throw new GradleException("Wave 7 subordinate report artifact is stale or missing: ${problems}")
+            }
+        }
+        w7FinalAssuranceMarkdownLines(evidence).each { String line ->
+            if (!markdown.contains(line)) {
+                throw new GradleException("Wave 7 final-assurance Markdown evidence does not match JSON evidence for line: ${line}")
+            }
+        }
+        if (!w7FinalAssuranceSelfCheck(rootProject.layout.buildDirectory.dir("tmp/wave7-final-self-check").get().asFile, rootProject.projectDir)) {
+            throw new GradleException("Wave 7 final-assurance fail-closed self-check failed")
+        }
+    }
+}
+
+static Map<String, Object> w7SubordinateEvidence(
+        final String id,
+        final File root,
+        final File jsonFile,
+        final File markdownFile,
+        final String currentHead) {
+    List<String> blockers = []
+    if (!jsonFile.isFile()) {
+        blockers.add("${id}: missing JSON report")
+    }
+    if (!markdownFile.isFile()) {
+        blockers.add("${id}: missing Markdown report")
+    }
+    Map<String, Object> parsed = [:]
+    if (blockers.isEmpty()) {
+        try {
+            parsed = new groovy.json.JsonSlurper().parse(jsonFile) as Map<String, Object>
+        } catch (RuntimeException exception) {
+            blockers.add("${id}: malformed JSON report")
+        }
+    }
+    String reportHead = w7SubordinateHead(id, parsed)
+    if (reportHead != currentHead) {
+        blockers.add("${id}: stale HEAD ${reportHead}")
+    }
+    blockers.addAll(w7SubordinateStatusBlockers(id, parsed, root))
+    Map<String, Object> row = [
+            id: id,
+            status: blockers.isEmpty() ? "PASS" : "BLOCKED",
+            currentHead: reportHead,
+            jsonArtifact: jsonFile.isFile() ? w7EvidenceFileArtifact(root, jsonFile) : [path: root.toPath().relativize(jsonFile.toPath()).toString().replace('\\', '/'), sizeBytes: 0L, sha256: "missing"],
+            markdownArtifact: markdownFile.isFile() ? w7EvidenceFileArtifact(root, markdownFile) : [path: root.toPath().relativize(markdownFile.toPath()).toString().replace('\\', '/'), sizeBytes: 0L, sha256: "missing"],
+            reportIdentity: jsonFile.isFile() ? w7FileSha256(jsonFile) : "missing",
+            blockers: blockers
+    ]
+    Object identity = parsed.currentRunIdentity
+    if (identity != null) {
+        row.currentRunIdentity = identity
+    }
+    return row
+}
+
+static String w7SubordinateHead(final String id, final Map<String, Object> parsed) {
+    if (id == "phase1" || id == "phase7") {
+        return parsed.currentHead ?: "missing"
+    }
+    if (id == "phase5" || id == "phase6" || id == "wave5") {
+        return parsed.gitCommit ?: "missing"
+    }
+    return "missing"
+}
+
+static List<String> w7SubordinateStatusBlockers(final String id, final Map<String, Object> parsed, final File root) {
+    List<String> blockers = []
+    if (parsed.isEmpty()) {
+        return blockers
+    }
+    if (id == "phase1") {
+        w7Require(parsed.formatVersion == "j7m-phase1-evidence-v2", blockers, "phase1: stale format")
+        w7Require(parsed.validationState == "PASS", blockers, "phase1: validation did not pass")
+        w7Require(w7CountsClean(parsed.tests as Map<String, Object>), blockers, "phase1: JUnit counts are not clean")
+        blockers.addAll(w7ValidateArtifacts(root, parsed.junitArtifacts as List<Object>).collect { Map<String, Object> row -> "phase1: ${row}" })
+    } else if (id == "phase5") {
+        w7Require(parsed.technicalRecommendation == "ACCEPT", blockers, "phase5: technical recommendation is not ACCEPT")
+        w7Require(w7CountsClean(parsed.testCounts as Map<String, Object>), blockers, "phase5: JUnit counts are not clean")
+        w7Require(((parsed.acceptanceMatrixStatusSummary as Map<String, Object>)?.FAIL ?: 0) == 0, blockers, "phase5: acceptance matrix contains FAIL")
+    } else if (id == "wave5") {
+        w7Require(parsed.technicalStatus == "TECHNICAL_PASS", blockers, "wave5: technical status is not pass")
+        w7Require(((parsed.blockers as List<Object>) ?: []).isEmpty(), blockers, "wave5: blockers present")
+        Map<String, Object> junit = parsed.junit as Map<String, Object>
+        w7Require(w7CountsClean(junit == null ? null : junit.totals as Map<String, Object>), blockers, "wave5: JUnit totals are not clean")
+    } else if (id == "phase6") {
+        w7Require(parsed.finalVerdict == "ACCEPT" || parsed.finalVerdict == "ACCEPT_PENDING_OWNER_COMMIT", blockers, "phase6: final verdict is blocked")
+        w7Require(parsed.sameRunWave5Evidence != null && (parsed.sameRunWave5Evidence as Map<String, Object>).technicalStatus == "TECHNICAL_PASS", blockers, "phase6: same-run Wave 5 evidence missing")
+        w7Require(w7CountsClean(parsed.testCounts as Map<String, Object>), blockers, "phase6: JUnit counts are not clean")
+    } else if (id == "phase7") {
+        w7Require(parsed.formatVersion == "j7m-phase7-evidence-v8", blockers, "phase7: stale format")
+        w7Require(parsed.validationState == "PASS", blockers, "phase7: validation did not pass")
+        w7Require(w7CountsClean(parsed.tests as Map<String, Object>), blockers, "phase7: JUnit counts are not clean")
+        Map<String, Object> categories = parsed.categories as Map<String, Object>
+        w7Require(categories != null && categories.phase711FinalAcceptance == "PASS", blockers, "phase7: final acceptance is not PASS")
+        w7Require(phase7ExecutableCategoriesPass(categories), blockers, "phase7: executable category failed")
+        w7Require(phase7GeneratedReleaseStatePass(parsed, phase7DirtyWorkingTree(root)), blockers, "phase7: release state does not match dirty-tree state")
+        w7Require(phase7ReportEvidencePass(root, parsed), blockers, "phase7: generated report evidence mismatch")
+    }
+    return blockers
+}
+
+static boolean w7CountsClean(final Map<String, Object> counts) {
+    if (counts == null) {
+        return false
+    }
+    int tests = ((counts.tests ?: 0) as Number).intValue()
+    int failures = ((counts.failures ?: 0) as Number).intValue()
+    int errors = ((counts.errors ?: 0) as Number).intValue()
+    int skipped = ((counts.skipped ?: 0) as Number).intValue()
+    return tests > 0 && failures == 0 && errors == 0 && skipped == 0
+}
+
+static void w7Require(final boolean condition, final List<String> blockers, final String message) {
+    if (!condition) {
+        blockers.add(message)
+    }
+}
+
+static String w7FinalAssuranceMarkdown(final Map<String, Object> evidence) {
+    List<String> lines = ["# Wave 7 Final-Assurance Evidence", ""]
+    lines.addAll(w7FinalAssuranceMarkdownLines(evidence))
+    lines.add("")
+    lines.add("Dirty working trees may produce a technical pass, but release remains blocked until owner-reviewed committed state is validated.")
+    return lines.join("\n") + "\n"
+}
+
+static List<String> w7FinalAssuranceMarkdownLines(final Map<String, Object> evidence) {
+    List<String> lines = [
+            "- Format version: `${evidence.formatVersion}`",
+            "- Generated at: `${evidence.generatedAt}`",
+            "- Current HEAD: `${evidence.currentHead}`",
+            "- Current-run identity: `${evidence.currentRunIdentity}`",
+            "- Dirty working tree: `${evidence.dirtyWorkingTree}`",
+            "- Technical status: `${evidence.technicalStatus}`",
+            "- Release verdict: `${evidence.releaseVerdict}`",
+            "- Release recommendation: `${evidence.releaseRecommendation}`"
+    ]
+    (evidence.subordinateEvidence as List<Object>).each { Object value ->
+        Map<String, Object> row = value as Map<String, Object>
+        lines.add("- Subordinate `${row.id}`: `${row.status}` `${row.currentHead}`")
+    }
+    return lines
+}
+
+static boolean w7FinalAssuranceSelfCheck(final File scratchRoot, final File root) {
+    scratchRoot.mkdirs()
+    String head = "0123456789012345678901234567890123456789"
+    Map<String, Object> phase1 = [formatVersion: "j7m-phase1-evidence-v2", currentHead: head,
+                                  validationState: "PASS", tests: [tests: 1, failures: 0, errors: 0, skipped: 0],
+                                  junitArtifacts: [[path: "missing.xml", sizeBytes: 0L, sha256: "missing"]]]
+    Map<String, Object> stalePhase1 = new LinkedHashMap<>(phase1)
+    stalePhase1.currentHead = "stale"
+    Map<String, Object> failingPhase1 = new LinkedHashMap<>(phase1)
+    failingPhase1.tests = [tests: 1, failures: 1, errors: 0, skipped: 0]
+    Map<String, Object> phase5 = [gitCommit: head, technicalRecommendation: "ACCEPT",
+                                  testCounts: [tests: 1, failures: 0, errors: 0, skipped: 0],
+                                  acceptanceMatrixStatusSummary: [FAIL: 0]]
+    Map<String, Object> stalePhase5 = new LinkedHashMap<>(phase5)
+    stalePhase5.gitCommit = "stale"
+    Map<String, Object> blockedWave5 = [gitCommit: head, technicalStatus: "BLOCKED", blockers: ["blocked"],
+                                        junit: [totals: [tests: 1, failures: 0, errors: 0, skipped: 0]]]
+    Map<String, Object> markdownFixture = [
+            formatVersion: "j7m-wave7-final-assurance-v1",
+            generatedAt: "2026-01-01T00:00:00Z",
+            currentHead: head,
+            currentRunIdentity: "identity",
+            dirtyWorkingTree: false,
+            technicalStatus: "TECHNICAL_PASS",
+            releaseVerdict: "ACCEPT",
+            releaseRecommendation: "OWNER_MAY_RELEASE_AFTER_REVIEW",
+            subordinateEvidence: [[id: "phase1", status: "PASS", currentHead: head]]
+    ]
+    Map<String, Object> missingReport = w7SubordinateEvidence("phase1", root,
+            new File(scratchRoot, "missing-phase1.json"), new File(scratchRoot, "missing-phase1.md"), head)
+    return w7SyntheticBlocked("phase1", stalePhase1, root, head)
+            && w7SyntheticBlocked("phase5", stalePhase5, root, head)
+            && w7SyntheticBlocked("phase1", failingPhase1, root, head)
+            && w7SyntheticBlocked("wave5", blockedWave5, root, head)
+            && missingReport.status == "BLOCKED"
+            && w7CountsClean([tests: 1, failures: 0, errors: 0, skipped: 0])
+            && !w7CountsClean([tests: 1, failures: 0, errors: 0, skipped: 1])
+            && w7FinalTechnicalStatus(true) == "TECHNICAL_PASS"
+            && w7FinalTechnicalStatus(false) == "BLOCKED"
+            && w7FinalReleaseVerdict(true, false) == "ACCEPT"
+            && w7FinalReleaseVerdict(true, true) == "RELEASE_BLOCKED_DIRTY_TREE"
+            && w7FinalReleaseVerdict(false, false) == "BLOCKED"
+            && w7FinalAssuranceMarkdownLines(markdownFixture).every { String line -> w7FinalAssuranceMarkdown(markdownFixture).contains(line) }
+            && w7MapIdentity([a: "b"]) == w7MapIdentity([a: "b"])
+}
+
+static boolean w7SyntheticBlocked(final String id, final Map<String, Object> parsed, final File root, final String head) {
+    List<String> blockers = []
+    if (w7SubordinateHead(id, parsed) != head) {
+        blockers.add("stale")
+    }
+    blockers.addAll(w7SubordinateStatusBlockers(id, parsed, root))
+    return !blockers.isEmpty()
+}
+
+static String w7FinalTechnicalStatus(final boolean allPass) {
+    return allPass ? "TECHNICAL_PASS" : "BLOCKED"
+}
+
+static String w7FinalReleaseVerdict(final boolean allPass, final boolean dirtyTree) {
+    if (!allPass) {
+        return "BLOCKED"
+    }
+    return dirtyTree ? "RELEASE_BLOCKED_DIRTY_TREE" : "ACCEPT"
+}
+
+/* Bounded documentation/evidence checks; excludes the historical aggregate test/demo run. */
+tasks.register("validateNuggetDocumentationContracts") {
+    group = "verification"
+    description = "Checks current public Nugget contracts and fail-closed evidence parsers."
+    doLast {
+        if (!phase7DocumentationPass(rootProject.projectDir)) {
+            throw new GradleException("Current public Nugget documentation contract is incomplete")
+        }
+        File scratch = layout.buildDirectory.dir("tmp/current-documentation-contracts").get().asFile
+        scratch.mkdirs()
+        if (phase7DocumentationPass(scratch)) {
+            throw new GradleException("Missing public documentation did not fail closed")
+        }
+        Map<String, Object> fixture = [tests: [suites: 1, tests: 1, failures: 0, errors: 0, skipped: 0],
+                categories: [phase711FinalAcceptance: "NOT_RELEASE_READY_DIRTY_TREE"], currentRunIdentity: "fixture-only"]
+        File report = new File(scratch, "build/reports/j7m/phase7/phase-7-acceptance.md")
+        report.parentFile.mkdirs()
+        report.setText(phase7EvidenceMarkdown(fixture), "UTF-8")
+        if (!phase7ReportEvidencePass(scratch, fixture)) {
+            throw new GradleException("Matching generated report was rejected")
+        }
+        report.append("Unexpected evidence text\n", "UTF-8")
+        if (phase7ReportEvidencePass(scratch, fixture)) {
+            throw new GradleException("Mutated generated report did not fail closed")
+        }
+        if (!phase7LedgerMismatchSelfCheck() || !phase7CurrentRunIdentitySelfCheck()
+                || !phase7CurrentSemanticSelfCheck() || !phase7MalformedSuiteSelfCheck(scratch)) {
+            throw new GradleException("Nugget generated evidence mutation self-check failed")
+        }
+    }
+}

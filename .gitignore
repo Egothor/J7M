@@ -1,0 +1,54 @@
+# Build outputs
+build/
+out/
+target/
+bin/
+
+# Gradle local state
+.gradle/
+.gradle-local/
+!gradle/wrapper/gradle-wrapper.jar
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# Java runtime artifacts
+hs_err_pid*
+replay_pid*
+
+# Python documentation tooling caches
+__pycache__/
+*.py[cod]
+
+# Eclipse IDE metadata and runtime files
+.project
+.classpath
+.settings/
+.metadata/
+.recommenders/
+.factorypath
+.apt_generated/
+.apt_generated_tests/
+.externalToolBuilders/
+.launches/
+*.launch
+*.pydevproject
+
+# IntelliJ IDEA and VS Code local metadata
+.idea/
+*.iml
+.vscode/
+
+# Local agent/tooling metadata
+.agents/
+.codex/
+AGENTS.md
+
+# OS-local files
+.DS_Store
+Thumbs.db

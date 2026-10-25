@@ -1,0 +1,18 @@
+[versions]
+grpc = "1.75.0"
+junit-jupiter = "5.14.3"
+junit-platform = "1.14.3"
+protobuf = "4.31.1"
+opentelemetry = "1.54.1"
+h2 = "2.3.232"
+
+[libraries]
+opentelemetry-api = { module = "io.opentelemetry:opentelemetry-api", version.ref = "opentelemetry" }
+h2 = { module = "com.h2database:h2", version.ref = "h2" }
+grpc-api = { module = "io.grpc:grpc-api", version.ref = "grpc" }
+grpc-netty-shaded = { module = "io.grpc:grpc-netty-shaded", version.ref = "grpc" }
+grpc-stub = { module = "io.grpc:grpc-stub", version.ref = "grpc" }
+junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit-jupiter" }
+junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher", version.ref = "junit-platform" }
+protobuf-java = { module = "com.google.protobuf:protobuf-java", version.ref = "protobuf" }
+

@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% macro home_navigation(items) %}
+<ul>
+  {% for item in items %}
+    {% if item.children %}
+    <li><details{% if item.title == "Get Started" %} open{% endif %}>
+      <summary>{{ item.title }}{% if item.title == "Annotations" %}<span class="j7m-nav-count">80</span>{% endif %}</summary>
+      {{ home_navigation(item.children) }}
+    </details></li>
+    {% else %}
+    <li><a href="{{ item.url | url }}"{% if item == page %} class="active" aria-current="page"{% endif %}>{{ item.title }}</a></li>
+    {% endif %}
+  {% endfor %}
+</ul>
+{% endmacro %}
+{% block tabs %}{% endblock %}
+{% block content %}
+<div class="j7m-home-shell">
+  <aside class="j7m-home-rail" aria-label="Documentation navigation">
+    <a class="j7m-home-brand" href="{{ '.' | url }}">
+      <img src="{{ 'assets/images/j7m-mark.svg' | url }}" alt="">
+      <span><strong>J7M</strong><small>DISTRIBUTED JAVA</small></span>
+    </a>
+    <nav class="j7m-home-nav j7m-desktop-nav" aria-label="Manual sections">{{ home_navigation(nav) }}</nav>
+    <details class="j7m-mobile-nav">
+      <summary>Browse</summary>
+      <nav class="j7m-home-nav" aria-label="Manual sections">{{ home_navigation(nav) }}</nav>
+    </details>
+    <div class="j7m-rail-note">Java 25 middleware<br>Applications · services · durable work</div>
+  </aside>
+  <div class="j7m-home-main">{{ page.content }}</div>
+</div>
+{% endblock %}

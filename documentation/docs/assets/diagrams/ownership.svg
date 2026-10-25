@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="420" viewBox="0 0 960 420" role="img" aria-labelledby="title desc">
+<title id="title">A lease needs an enforced fence</title><desc id="desc">Ownership changes advance a fencing token. A cooperating resource rejects the old worker rather than relying on the worker to stop.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 10 5 0 10Z" fill="#2587b6"/></marker></defs>
+<rect x="1" y="1" width="958" height="418" rx="16" fill="#f3f8fc" stroke="#d9e6ee"/>
+<text x="30" y="37" fill="#071a2c" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="700">A lease needs an enforced fence</text>
+<path d="M280 130H340V195H390" fill="none" stroke="#2587b6" stroke-width="2" marker-end="url(#arrow)" stroke-dasharray="6 5"/>
+<path d="M280 295H340V235H390" fill="none" stroke="#2587b6" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M625 215H730" fill="none" stroke="#2587b6" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="678" y="198" text-anchor="middle" fill="#235775" font-family="Segoe UI,Arial,sans-serif" font-size="13">validate</text>
+<rect x="30" y="85" width="250" height="95" rx="10" fill="white" stroke="#9fbdcf" stroke-width="1.4"/><rect x="30" y="85" width="250" height="7" rx="3" fill="#efc45c"/><text x="46" y="117" fill="#0b263e" font-family="Segoe UI,Arial,sans-serif" font-size="16" font-weight="700">Worker A</text>
+<text x="46" y="142" fill="#3e5d73" font-family="Segoe UI,Arial,sans-serif" font-size="14">Earlier ownership</text>
+<text x="46" y="163" fill="#3e5d73" font-family="Segoe UI,Arial,sans-serif" font-size="14">Fence 42</text>
+<rect x="30" y="250" width="250" height="95" rx="10" fill="white" stroke="#9fbdcf" stroke-width="1.4"/><rect x="30" y="250" width="250" height="7" rx="3" fill="#efc45c"/><text x="46" y="282" fill="#0b263e" font-family="Segoe UI,Arial,sans-serif" font-size="16" font-weight="700">Worker B</text>
+<text x="46" y="307" fill="#3e5d73" font-family="Segoe UI,Arial,sans-serif" font-size="14">Current ownership</text>
+<text x="46" y="328" fill="#3e5d73" font-family="Segoe UI,Arial,sans-serif" font-size="14">Fence 43</text>
+<rect x="390" y="165" width="235" height="100" rx="10" fill="white" stroke="#9fbdcf" stroke-width="1.4"/><rect x="390" y="165" width="235" height="7" rx="3" fill="#efc45c"/><text x="406" y="197" fill="#0b263e" font-family="Segoe UI,Arial,sans-serif" font-size="16" font-weight="700">Authority</text>
+<text x="406" y="222" fill="#3e5d73" font-family="Segoe UI,Arial,sans-serif" font-size="14">Lease / group epoch</text>
+<text x="406" y="243" fill="#3e5d73" font-family="Segoe UI,Arial,sans-serif" font-size="14">Current fence advances</text>
+<rect x="730" y="165" width="200" height="100" rx="10" fill="white" stroke="#9fbdcf" stroke-width="1.4"/><rect x="730" y="165" width="200" height="7" rx="3" fill="#efc45c"/><text x="746" y="197" fill="#0b263e" font-family="Segoe UI,Arial,sans-serif" font-size="16" font-weight="700">Effect boundary</text>
+<text x="746" y="222" fill="#3e5d73" font-family="Segoe UI,Arial,sans-serif" font-size="14">Reject stale fence</text>
+<text x="746" y="243" fill="#3e5d73" font-family="Segoe UI,Arial,sans-serif" font-size="14">Accept current fence</text>
+<text x="30" y="395" fill="#466174" font-family="Segoe UI,Arial,sans-serif" font-size="13">The external effect must check authority; an annotation cannot fence an arbitrary external system.</text></svg>

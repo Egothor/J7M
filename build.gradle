@@ -1,0 +1,26 @@
+// Copyright (c) 2026, Leo Galambos and the Egothor team
+// https://www.egothor.org
+// SPDX-License-Identifier: BSD-4-Clause
+// Licensed under the BSD 4-Clause License; see LICENSE for the full terms.
+// This product includes software developed by Leo Galambos and the Egothor
+// team (https://www.egothor.org).
+
+plugins {
+    id "java-library"
+}
+
+/*
+ * Root orchestration entry point. Module dependency graphs live in module-local
+ * build.gradle files; runnable demo task bodies live in j7m-demo; reusable
+ * conventions live in buildSrc. The files applied below are named root-level
+ * orchestration segments, each with its own purpose and ownership comment.
+ */
+
+apply from: "gradle/build-logic/root/00-bootstrap.gradle"
+apply from: "gradle/build-logic/root/10-quality-gates.gradle"
+apply from: "gradle/build-logic/root/20-build-validation.gradle"
+apply from: "gradle/build-logic/root/30-example-aggregation.gradle"
+apply from: "gradle/build-logic/root/40-architecture-and-reliability.gradle"
+apply from: "gradle/build-logic/root/50-application-platform-reports.gradle"
+apply from: "gradle/build-logic/root/60-sovereign-acceptance-report.gradle"
+apply from: "gradle/build-logic/root/70-documentation-platform.gradle"

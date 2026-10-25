@@ -1,0 +1,20 @@
+// Copyright (c) 2026, Leo Galambos and the Egothor team
+// https://www.egothor.org
+// SPDX-License-Identifier: BSD-4-Clause
+// Licensed under the BSD 4-Clause License; see LICENSE for the full terms.
+// This product includes software developed by Leo Galambos and the Egothor
+// team (https://www.egothor.org).
+
+dependencies {
+    implementation project(":j7m-api")
+    testImplementation project(":j7m-kernel")
+    testImplementation libs.junit.jupiter
+    testRuntimeOnly libs.junit.platform.launcher
+}
+
+tasks.named('test') {
+    dependsOn ':j7m-api:jar', ':j7m-kernel:jar', tasks.named('jar')
+    doFirst { systemProperty 'j7m.processor.test.classpath', sourceSets.test.runtimeClasspath.asPath }
+    systemProperty 'j7m.processor.test.api', project(':j7m-api').tasks.named('jar').get().archiveFile.get().asFile
+    systemProperty 'j7m.processor.test.jar', tasks.named('jar').get().archiveFile.get().asFile
+}

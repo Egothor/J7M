@@ -1,0 +1,39 @@
+{
+  "schemaVersion": "j7m.application/v1",
+  "application": {
+    "group": "org.j7m.examples",
+    "name": "hello-remote-service",
+    "version": "1.0.0",
+    "displayName": "Hello Remote Service",
+    "description": "Deployable J7M hello service"
+  },
+  "runtime": {
+    "minJ7mVersion": "0.5.2",
+    "javaVersion": "25",
+    "moduleMode": "CLASSPATH",
+    "bootstrapClass": "org.j7m.middleware.examples.hello.HelloApplication"
+  },
+  "services": [
+    {
+      "serviceName": "//apps/example/hello/HelloService",
+      "interfaceName": "org.j7m.middleware.examples.hello.HelloService",
+      "implementationClass": "org.j7m.middleware.examples.hello.HelloServiceImpl",
+      "transport": "grpc",
+      "globallyExported": true,
+      "metadata": {
+        "domain": "example",
+        "classification": "internal"
+      }
+    }
+  ],
+  "security": {
+    "trustDomain": "dev",
+    "confidential": false
+  },
+  "resources": {
+    "cpu": "1",
+    "memory": "256MiB",
+    "maxConcurrentInvocations": 32,
+    "maxInboundPayload": "4MiB"
+  }
+}

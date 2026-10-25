@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "j7m.application/v1",
+  "application": {
+    "group": "org.j7m.examples",
+    "name": "annotation-first-saga-workflow",
+    "version": "1.0.0",
+    "displayName": "Annotation First Saga Workflow",
+    "description": "Annotation descriptor for saga workflow metadata"
+  },
+  "runtime": {
+    "minJ7mVersion": "0.6.11",
+    "javaVersion": "25",
+    "moduleMode": "CLASSPATH",
+    "bootstrapClass": "org.j7m.middleware.examples.annotation.AnnotationExampleApplication"
+  }
+}

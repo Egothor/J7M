@@ -1,0 +1,63 @@
+// Copyright (c) 2026, Leo Galambos and the Egothor team
+// https://www.egothor.org
+// SPDX-License-Identifier: BSD-4-Clause
+// Licensed under the BSD 4-Clause License; see LICENSE for the full terms.
+// This product includes software developed by Leo Galambos and the Egothor
+// team (https://www.egothor.org).
+
+plugins {
+    id 'application'
+}
+
+description = 'Annotation-first lifecycle and health example validated by Phase 6.11 tasks.'
+
+java {
+    modularity.inferModulePath = true
+}
+
+String defaultJ7mRepository = layout.projectDirectory.dir("j7m-local-repository").asFile.absolutePath
+String j7mRepository = providers.gradleProperty("j7mRepository").orElse(defaultJ7mRepository).get()
+
+repositories {
+    maven {
+        url = uri(j7mRepository)
+    }
+}
+
+dependencies {
+    implementation "org.j7m:j7m-api:0.1.0-SNAPSHOT"
+    implementation "org.j7m:j7m-application-platform:0.1.0-SNAPSHOT"
+}
+
+application {
+    mainClass = "org.j7m.examples.annotation.lifecycle.LifecycleExampleMain"
+}
+
+tasks.named("test") {
+    failOnNoDiscoveredTests = false
+}
+
+tasks.register("verifyExpectedOutput", JavaExec) {
+    group = "verification"
+    description = "Runs the lifecycle annotation-first smoke flow and checks EXPECTED_OUTPUT markers."
+    dependsOn "classes"
+    mainClass = application.mainClass.get()
+    classpath = sourceSets.main.runtimeClasspath
+    ByteArrayOutputStream capturedOutput = new ByteArrayOutputStream()
+    standardOutput = capturedOutput
+    errorOutput = capturedOutput
+    inputs.file layout.projectDirectory.file("EXPECTED_OUTPUT.txt")
+    outputs.file layout.buildDirectory.file("reports/annotation-first-lifecycle.out")
+
+    doLast {
+        File outputFile = layout.buildDirectory.file("reports/annotation-first-lifecycle.out").get().asFile
+        outputFile.parentFile.mkdirs()
+        String actual = capturedOutput.toString("UTF-8").replace("\r\n", "\n")
+        outputFile.setText(actual, "UTF-8")
+        file("EXPECTED_OUTPUT.txt").readLines("UTF-8").findAll { String line -> !line.isBlank() }.each { String marker ->
+            if (!actual.contains(marker)) {
+                throw new GradleException("lifecycle annotation example output missing expected marker: ${marker}")
+            }
+        }
+    }
+}

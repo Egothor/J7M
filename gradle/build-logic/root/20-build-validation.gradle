@@ -1,0 +1,1704 @@
+// Copyright (c) 2026, Leo Galambos and the Egothor team
+// https://www.egothor.org
+// SPDX-License-Identifier: BSD-4-Clause
+// Licensed under the BSD 4-Clause License; see LICENSE for the full terms.
+// This product includes software developed by Leo Galambos and the Egothor
+// team (https://www.egothor.org).
+
+/*
+ * Purpose: validates Gradle build architecture, version catalog use, module topology,
+ * injection model presence, annotation model coverage, and example documentation quality.
+ * Owns: validateBuildConventions, validateVersionCatalog, validateModuleTopology,
+ * validateInjectionModel, validateAnnotationModel, validateAnnotationExamples,
+ * validateExampleJavadocs, validateExampleSourceDocumentation, and validateProfessionalJavadocs.
+ * Must not own: production dependency declarations, demo JavaExec implementations,
+ * example packaging implementations, or release-report generation.
+ * Root rationale: these are cross-repository guards that inspect build logic,
+ * modules, and examples from an orchestration perspective.
+ * Related validation tasks: validateBuildConventions, validateVersionCatalog,
+ * validateModuleTopology, validateInjectionModel, validateAnnotationModel,
+ * validateAnnotationExamples, validateExampleJavadocs, validateExampleSourceDocumentation,
+ * validateProfessionalJavadocs.
+ */
+
+tasks.register("validateBuildConventions") {
+    group = "verification"
+    description = "Validates Phase 6.11 Gradle convention plugin structure."
+    doLast {
+        int rootBuildNonCommentLimit = 80
+        int rootBuildTaskRegistrationLimit = 0
+        List<String> requiredPlugins = [
+                "j7m.java-conventions.gradle",
+                "j7m.jpms-library.gradle",
+                "j7m.public-api-module.gradle",
+                "j7m.platform-service-module.gradle",
+                "j7m.transport-module.gradle",
+                "j7m.demo-module.gradle",
+                "j7m.example-module.gradle",
+                "j7m.test-module.gradle",
+                "j7m.tck-module.gradle",
+                "j7m.javadoc-conventions.gradle",
+                "j7m.validation-conventions.gradle"
+        ]
+        List<String> missing = requiredPlugins.findAll { String pluginName ->
+            !file("buildSrc/src/main/groovy/${pluginName}").isFile()
+        }
+        if (!missing.isEmpty()) {
+            throw new GradleException("missing convention plugins: ${missing}")
+        }
+        String rootBuild = file("build.gradle").getText("UTF-8")
+        Closure<Integer> nonCommentLines = { String text ->
+            int count = 0
+            text.readLines().each { String line ->
+                String trimmed = line.trim()
+                if (!trimmed.isEmpty() && !trimmed.startsWith("//")) {
+                    count++
+                }
+            }
+            return count
+        }
+        Closure<Void> validateRootText = { String text ->
+            int nonComment = nonCommentLines(text)
+            if (nonComment > rootBuildNonCommentLimit) {
+                throw new GradleException("root build.gradle exceeds orchestration line budget: ${nonComment} > ${rootBuildNonCommentLimit}")
+            }
+            int taskRegistrations = 0
+            java.util.regex.Matcher taskMatcher = java.util.regex.Pattern.compile("(?m)^\\s*tasks\\.register\\(").matcher(text)
+            while (taskMatcher.find()) {
+                taskRegistrations++
+            }
+            if (taskRegistrations > rootBuildTaskRegistrationLimit) {
+                throw new GradleException("root build.gradle contains inline task registrations: ${taskRegistrations}")
+            }
+            if (java.util.regex.Pattern.compile("(?m)^\\s*project\\(\\s*['\\\"]:j7m-[^'\\\"]+['\\\"]\\s*\\)\\s*\\{").matcher(text).find()) {
+                throw new GradleException("root build.gradle contains module-specific project configuration block")
+            }
+            if (java.util.regex.Pattern.compile("(?m)^\\s*tasks\\.register\\(\\s*['\\\"]run[A-Za-z0-9]*(Demo|Example)['\\\"]\\s*,\\s*JavaExec").matcher(text).find()) {
+                throw new GradleException("root build.gradle contains module-specific JavaExec demo task body")
+            }
+            if (java.util.regex.Pattern.compile("(?m)^\\s*(api|implementation|compileOnly|runtimeOnly|testImplementation|testRuntimeOnly)\\s+project\\(\\s*['\\\"]:j7m-[^'\\\"]+['\\\"]\\s*\\)").matcher(text).find()) {
+                throw new GradleException("root build.gradle contains production module dependency wiring")
+            }
+        }
+        List<String> missingSegmentDocumentation = []
+        fileTree("gradle/build-logic/root").matching { include "*.gradle" }.files.each { File segment ->
+            String text = segment.getText("UTF-8")
+            ["Purpose:", "Owns:", "Must not own:", "Root rationale:", "Related validation tasks:"].each { String marker ->
+                if (!text.contains(marker)) {
+                    missingSegmentDocumentation.add("${segment}:${marker}")
+                }
+            }
+            if (java.util.regex.Pattern.compile("(?m)^\\s*(api|implementation|compileOnly|runtimeOnly|testImplementation|testRuntimeOnly)\\s+project\\(").matcher(text).find()) {
+                throw new GradleException("root build segment hides production dependency graph: ${segment}")
+            }
+            if (java.util.regex.Pattern.compile("(?m)^\\s*tasks\\.register\\(\\s*['\\\"]run[A-Za-z0-9]*(Demo|Example)['\\\"]\\s*,\\s*JavaExec").matcher(text).find()) {
+                throw new GradleException("root build segment contains demo JavaExec task body: ${segment}")
+            }
+        }
+        if (!missingSegmentDocumentation.isEmpty()) {
+            throw new GradleException("root build segments missing ownership documentation: ${missingSegmentDocumentation}")
+        }
+        Map<String, String> rootConventionPatterns = [
+                "JavaCompile convention": "(?m)^\\s*tasks\\.withType\\(JavaCompile\\)",
+                "Test convention": "(?m)^\\s*tasks\\.withType\\(Test\\)",
+                "JavaExec convention": "(?m)^\\s*tasks\\.withType\\(JavaExec\\)",
+                "Javadoc convention": "(?m)^\\s*tasks\\.withType\\(Javadoc\\)"
+        ]
+        rootConventionPatterns.each { String label, String pattern ->
+            if (java.util.regex.Pattern.compile(pattern).matcher(rootBuild).find()) {
+                throw new GradleException("root build still owns repeated ${label}")
+            }
+        }
+        validateRootText(rootBuild)
+
+        List<String> weakConventionPlugins = []
+        fileTree("buildSrc/src/main/groovy").matching { include "j7m.*.gradle" }.files.each { File plugin ->
+            String text = plugin.getText("UTF-8")
+            boolean hasPurpose = text.contains("j7mConventionPurpose")
+            boolean hasConfiguration = text.contains("tasks.withType")
+                    || text.contains("java {")
+                    || text.contains("application")
+                    || text.contains("j7mConventionKind")
+            if (!hasPurpose || !hasConfiguration) {
+                weakConventionPlugins.add(plugin.path)
+            }
+        }
+        if (!weakConventionPlugins.isEmpty()) {
+            throw new GradleException("convention plugins lack meaningful configuration or documented purpose: ${weakConventionPlugins}")
+        }
+
+        List<String> moduleBuildViolations = []
+        fileTree(".").matching {
+            include "j7m-*/build.gradle"
+            include "examples/*/build.gradle"
+            include "examples/*/*/build.gradle"
+            exclude "build/**"
+        }.files.each { File moduleBuild ->
+            String text = moduleBuild.getText("UTF-8")
+            if (java.util.regex.Pattern.compile("\"(?:org\\.junit|org\\.junit\\.platform|io\\.grpc|com\\.google\\.protobuf):[^\"]+:[^\"]+\"").matcher(text).find()) {
+                moduleBuildViolations.add("${moduleBuild}:hardcoded dependency version")
+            }
+            ["tasks.withType(JavaCompile)", "tasks.withType(Test)", "tasks.withType(Javadoc)", "tasks.withType(JavaExec)", "languageVersion = JavaLanguageVersion.of"].each { String marker ->
+                if (text.contains(marker)) {
+                    moduleBuildViolations.add("${moduleBuild}:repeated standard boilerplate ${marker}")
+                }
+            }
+        }
+        if (!moduleBuildViolations.isEmpty()) {
+            throw new GradleException("module-local build convention violations: ${moduleBuildViolations}")
+        }
+
+        Closure<Void> expectBuildConventionFailure = { String name, Closure<Void> action ->
+            try {
+                action.call()
+            } catch (GradleException expected) {
+                return
+            }
+            throw new GradleException("synthetic invalid build convention passed validation: ${name}")
+        }
+        String oversizedRoot = (1..(rootBuildNonCommentLimit + 1)).collect { "tasks.register(\"x${it}\") { }" }.join("\n")
+        expectBuildConventionFailure("oversized-root") { validateRootText(oversizedRoot) }
+        expectBuildConventionFailure("root-project-block") { validateRootText("project(\":j7m-demo\") { dependencies { implementation project(\":j7m-api\") } }") }
+        expectBuildConventionFailure("root-demo-javaexec") { validateRootText("tasks.register(\"runExampleDemo\", JavaExec) { mainClass = \"Example\" }") }
+        expectBuildConventionFailure("root-example-task") { validateRootText("tasks.register(\"runExampleSmoke\") { doLast { println \"example\" } }") }
+        expectBuildConventionFailure("root-dependency-wiring") { validateRootText("implementation project(\":j7m-demo\")") }
+        expectBuildConventionFailure("undocumented-segment") {
+            String badSegment = "tasks.register(\"validateSomething\") { }"
+            if (!badSegment.contains("Purpose:")) {
+                throw new GradleException("synthetic undocumented segment rejected")
+            }
+        }
+        expectBuildConventionFailure("mixed-concern-segment") {
+            String badSegment = "implementation project(\":j7m-api\")"
+            if (java.util.regex.Pattern.compile("(?m)^\\s*(api|implementation|compileOnly|runtimeOnly|testImplementation|testRuntimeOnly)\\s+project\\(").matcher(badSegment).find()) {
+                throw new GradleException("synthetic mixed-concern segment rejected")
+            }
+        }
+        expectBuildConventionFailure("hardcoded-version") {
+            String badModule = "dependencies { testImplementation \"org.junit.jupiter:junit-jupiter:5.14.3\" }"
+            if (badModule.contains("org.junit.jupiter:junit-jupiter:5.14.3")) {
+                throw new GradleException("synthetic hardcoded version rejected")
+            }
+        }
+        expectBuildConventionFailure("repeated-boilerplate") {
+            String badModule = "tasks.withType(JavaCompile).configureEach { options.release = 25 }"
+            if (badModule.contains("tasks.withType(JavaCompile)")) {
+                throw new GradleException("synthetic repeated boilerplate rejected")
+            }
+        }
+        expectBuildConventionFailure("noop-convention") {
+            String badPlugin = "plugins { id \"j7m.java-conventions\" }"
+            if (!badPlugin.contains("j7mConventionPurpose")) {
+                throw new GradleException("synthetic no-op convention rejected")
+            }
+        }
+    }
+}
+
+tasks.register("validateVersionCatalog") {
+    group = "verification"
+    description = "Validates centralized dependency versions and forbidden dependency patterns."
+    doLast {
+        File catalog = file("gradle/libs.versions.toml")
+        if (!catalog.isFile()) {
+            throw new GradleException("missing Gradle version catalog: gradle/libs.versions.toml")
+        }
+        String catalogText = catalog.getText("UTF-8")
+        ["junit-jupiter", "junit-platform-launcher", "grpc-api", "grpc-stub", "grpc-netty-shaded", "protobuf-java"].each { String alias ->
+            if (!catalogText.contains(alias)) {
+                throw new GradleException("version catalog missing required alias: ${alias}")
+            }
+        }
+        String rootBuild = file("build.gradle").getText("UTF-8")
+        java.util.regex.Matcher coordinateMatcher = java.util.regex.Pattern
+                .compile("\"(?:org\\.junit|org\\.junit\\.platform|io\\.grpc|com\\.google\\.protobuf):[^\"]+:[^\"]+\"")
+                .matcher(rootBuild)
+        if (coordinateMatcher.find()) {
+            throw new GradleException("hardcoded third-party dependency coordinate remains in root build: ${coordinateMatcher.group()}")
+        }
+        List<String> forbidden = [
+                "org.apache.kafka", "com.rabbitmq", "org.apache.pulsar", "io.etcd", "org.apache.zookeeper",
+                "io.kubernetes", "io.fabric8", "org.postgresql", "org.elasticsearch", "com.amazonaws",
+                "software.amazon.awssdk", "com.google.cloud", "com.azure", "com.github.dockerjava",
+                "org.testcontainers"
+        ]
+        List<String> matches = []
+        [catalog, file("build.gradle"), file("settings.gradle")].findAll { File candidate -> candidate.isFile() }.each { File candidate ->
+            candidate.readLines("UTF-8").eachWithIndex { String line, int index ->
+                String trimmed = line.trim()
+                boolean productionDependencyLine = trimmed ==~ /^(api|implementation|compileOnly|runtimeOnly)\s+.*/
+                boolean catalogDependencyLine = candidate.name == "libs.versions.toml" && trimmed.startsWith("[") == false
+                if (productionDependencyLine || catalogDependencyLine) {
+                    forbidden.each { String token ->
+                        if (trimmed.contains(token)) {
+                            matches.add("${candidate}:${index + 1}:${token}")
+                        }
+                    }
+                }
+            }
+        }
+        if (!matches.isEmpty()) {
+            throw new GradleException("forbidden production dependency pattern found: ${matches}")
+        }
+    }
+}
+
+tasks.register("validateModuleTopology") {
+    group = "verification"
+    description = "Validates the current published module topology inventory."
+    doLast {
+        File topology = file("documentation/docs/programming/module-dependencies.md")
+        if (!topology.isFile()) {
+            throw new GradleException("missing module consolidation document")
+        }
+        String text = topology.getText("UTF-8")
+        ["JPMS", "requires", "ServiceLoader"].each { String marker ->
+            if (!text.contains(marker)) {
+                throw new GradleException("module topology document missing marker: ${marker}")
+            }
+        }
+        List<String> missingProjects = subprojects.findAll { Project candidate ->
+            candidate.file("src/main/java/module-info.java").isFile()
+        }.collect { Project candidate -> candidate.path }
+                .findAll { String path -> !text.contains(path.substring(1)) }
+        if (!missingProjects.isEmpty()) {
+            throw new GradleException("module topology document missing subprojects: ${missingProjects}")
+        }
+    }
+}
+
+tasks.register("validateInjectionModel") {
+    group = "verification"
+    description = "Validates the J7M-native injection model vertical slice."
+    dependsOn ":j7m-application-platform:test"
+    doLast {
+        [
+                "j7m-api/src/main/java/org/j7m/middleware/application/api/J7mInjector.java",
+                "j7m-api/src/main/java/org/j7m/middleware/application/api/InjectionBindingKey.java",
+                "j7m-application-platform/src/main/java/org/j7m/middleware/application/components/DefaultJ7mInjector.java",
+                "j7m-application-platform/src/test/java/org/j7m/middleware/application/components/J7mInjectionModelTest.java"
+        ].each { String path ->
+            if (!file(path).isFile()) {
+                throw new GradleException("missing injection model file: ${path}")
+            }
+        }
+    }
+}
+
+tasks.register("validateAnnotationModel") {
+    group = "verification"
+    description = "Validates the annotation-first developer programming model."
+    dependsOn ":j7m-application-platform:test"
+    doLast {
+        [
+                "J7mApplication.java", "J7mComponent.java", "J7mService.java", "Inject.java",
+                "ConfigValue.java", "J7mResource.java", "CurrentInvocation.java", "CurrentPrincipal.java",
+                "CurrentApplication.java", "HealthCheck.java", "ReadinessCheck.java"
+        ].each { String fileName ->
+            if (!file("j7m-api/src/main/java/org/j7m/middleware/annotations/${fileName}").isFile()) {
+                throw new GradleException("missing annotation API: ${fileName}")
+            }
+        }
+        if (!file("j7m-application-platform/src/main/java/org/j7m/middleware/application/components/AnnotationModelProcessor.java").isFile()) {
+            throw new GradleException("missing annotation model processor")
+        }
+    }
+}
+
+List<String> annotationFirstStandaloneExamples = [
+        "annotation-first-simple-service",
+        "annotation-first-secure-service",
+        "annotation-first-remote-invocation",
+        "annotation-first-security-audit",
+        "annotation-first-saga-workflow",
+        "annotation-first-durable-queue-consumer",
+        "annotation-first-lifecycle",
+        "annotation-first-isolation-profile",
+        "annotation-first-observability"
+]
+List<String> annotationFirstBasicCopyPasteExamples = [
+        "annotation-first-simple-service",
+        "annotation-first-lifecycle"
+]
+Set<String> annotationFirstModularExamples = [
+        "annotation-first-simple-service",
+        "annotation-first-secure-service",
+        "annotation-first-saga-workflow",
+        "annotation-first-durable-queue-consumer",
+        "annotation-first-lifecycle",
+        "annotation-first-isolation-profile",
+        "annotation-first-observability"
+] as Set
+Map<String, String> annotationFirstSmokeMainClasses = [
+        "annotation-first-simple-service": "org.j7m.examples.annotation.simple.SimpleExampleMain",
+        "annotation-first-remote-invocation": "org.j7m.examples.annotation.remote.RemoteInvocationExampleMain",
+        "annotation-first-security-audit": "org.j7m.examples.annotation.securityaudit.SecurityAuditExampleMain",
+        "annotation-first-saga-workflow": "org.j7m.examples.annotation.saga.SagaExampleMain",
+        "annotation-first-durable-queue-consumer": "org.j7m.examples.annotation.queue.QueueExampleMain",
+        "annotation-first-lifecycle": "org.j7m.examples.annotation.lifecycle.LifecycleExampleMain",
+        "annotation-first-isolation-profile": "org.j7m.examples.annotation.isolation.IsolationExampleMain",
+        "annotation-first-observability": "org.j7m.examples.annotation.observability.ObservabilityExampleMain"
+]
+Closure<String> annotationFirstTaskSuffix = { String example ->
+    return example.split("-").collect { String part -> part.capitalize() }.join("")
+}
+
+List<TaskProvider<JavaCompile>> annotationFirstStandaloneCompileTasks = []
+List<TaskProvider<JavaExec>> annotationFirstStandaloneSmokeTasks = []
+annotationFirstStandaloneExamples.each { String example ->
+    String suffix = annotationFirstTaskSuffix(example)
+    Provider<Directory> mainDestination = layout.buildDirectory.dir("classes/annotation-first-standalone/${example}/main")
+    TaskProvider<JavaCompile> mainCompile = tasks.register("compile${suffix}StandaloneMain", JavaCompile) { JavaCompile task ->
+        group = "verification"
+        description = "Compiles the standalone ${example} main sources against the exported J7M public API."
+        dependsOn ":j7m-api:classes"
+        dependsOn ":j7m-kernel:classes"
+        dependsOn ":j7m-runtime:classes"
+        dependsOn ":j7m-durable-log:classes"
+        dependsOn ":j7m-application-platform:classes"
+        source = files(fileTree("examples/${example}/src/main/java") {
+            include "**/*.java"
+        })
+        classpath = files(
+                project(":j7m-api").sourceSets.main.output,
+                project(":j7m-kernel").sourceSets.main.output,
+                project(":j7m-runtime").sourceSets.main.output,
+                project(":j7m-durable-log").sourceSets.main.output,
+                project(":j7m-application-platform").sourceSets.main.output)
+        destinationDirectory = mainDestination
+        options.release = 25
+        options.encoding = "UTF-8"
+    }
+    TaskProvider<JavaCompile> testCompile = tasks.register("compile${suffix}StandaloneTest", JavaCompile) { JavaCompile task ->
+        group = "verification"
+        description = "Compiles the standalone ${example} test sources against the compiled example main output."
+        dependsOn mainCompile
+        source = files(fileTree("examples/${example}/src/test/java") {
+            include "**/*.java"
+        })
+        classpath = files(
+                mainDestination,
+                project(":j7m-api").sourceSets.main.output,
+                project(":j7m-kernel").sourceSets.main.output,
+                project(":j7m-runtime").sourceSets.main.output,
+                project(":j7m-durable-log").sourceSets.main.output,
+                project(":j7m-application-platform").sourceSets.main.output)
+        destinationDirectory = layout.buildDirectory.dir("classes/annotation-first-standalone/${example}/test")
+        options.release = 25
+        options.encoding = "UTF-8"
+    }
+    annotationFirstStandaloneCompileTasks.add(testCompile)
+    if (annotationFirstSmokeMainClasses.containsKey(example)) {
+        TaskProvider<JavaExec> smokeTask = tasks.register("smoke${suffix}StandaloneExample", JavaExec) { JavaExec task ->
+            group = "verification"
+            description = "Runs deterministic annotation-first smoke output for ${example}."
+            dependsOn mainCompile
+            mainClass = annotationFirstSmokeMainClasses.get(example)
+            classpath = files(
+                    mainDestination,
+                    project(":j7m-api").sourceSets.main.output,
+                    project(":j7m-kernel").sourceSets.main.output,
+                    project(":j7m-runtime").sourceSets.main.output,
+                    project(":j7m-durable-log").sourceSets.main.output,
+                    project(":j7m-application-platform").sourceSets.main.output)
+            ByteArrayOutputStream capturedOutput = new ByteArrayOutputStream()
+            standardOutput = capturedOutput
+            errorOutput = capturedOutput
+            outputs.file layout.buildDirectory.file("reports/j7m/annotation-first/${example}.out")
+            doLast {
+                File output = layout.buildDirectory.file("reports/j7m/annotation-first/${example}.out").get().asFile
+                output.parentFile.mkdirs()
+                String actual = capturedOutput.toString("UTF-8").replace("\r\n", "\n")
+                output.setText(actual, "UTF-8")
+                File expectedFile = file("examples/${example}/EXPECTED_OUTPUT.txt")
+                expectedFile.readLines("UTF-8").findAll { String line -> !line.isBlank() }.each { String marker ->
+                    if (!actual.contains(marker)) {
+                        throw new GradleException("annotation-first smoke output for ${example} missing expected marker: ${marker}")
+                    }
+                }
+                ["J7M_SECURITY_AUDIT_SENTINEL_SECRET", "J7M_OBSERVABILITY_SENTINEL_SECRET"].each { String sentinel ->
+                    if (actual.contains(sentinel)) {
+                        throw new GradleException("annotation-first smoke output for ${example} leaked secret sentinel: ${sentinel}")
+                    }
+                }
+            }
+        }
+        annotationFirstStandaloneSmokeTasks.add(smokeTask)
+    }
+}
+
+List<Map<String, Object>> annotationFirstBasicCopyPasteMavenModules = [
+        [projectPath: ":j7m-api", artifactId: "j7m-api", dependencies: []],
+        [projectPath: ":j7m-kernel", artifactId: "j7m-kernel", dependencies: ["j7m-api"]],
+        [projectPath: ":j7m-runtime", artifactId: "j7m-runtime", dependencies: ["j7m-api", "j7m-kernel"]],
+        [projectPath: ":j7m-durable-log", artifactId: "j7m-durable-log", dependencies: ["j7m-api"]],
+        [projectPath: ":j7m-application-platform", artifactId: "j7m-application-platform", dependencies: ["j7m-api", "j7m-runtime", "j7m-durable-log"]]
+]
+Provider<Directory> annotationFirstBasicMavenRepository = layout.buildDirectory.dir("tmp/annotation-first-basic-maven-repository")
+TaskProvider<Task> prepareAnnotationFirstBasicMavenRepository = tasks.register("prepareAnnotationFirstBasicCopyPasteMavenRepository") { Task task ->
+    group = "verification"
+    description = "Prepares a deterministic local Maven-style repository for BASIC annotation-first copy/paste validation."
+    dependsOn annotationFirstBasicCopyPasteMavenModules.collect { Map<String, Object> module -> "${module.projectPath}:jar" }
+    outputs.dir annotationFirstBasicMavenRepository
+    doLast {
+        File repositoryRoot = annotationFirstBasicMavenRepository.get().asFile
+        delete(repositoryRoot)
+        annotationFirstBasicCopyPasteMavenModules.each { Map<String, Object> module ->
+            Project moduleProject = project(module.projectPath as String)
+            org.gradle.jvm.tasks.Jar jarTask = moduleProject.tasks.named("jar", org.gradle.jvm.tasks.Jar).get()
+            File jarFile = jarTask.archiveFile.get().asFile
+            File artifactDirectory = new File(repositoryRoot, "org/j7m/${module.artifactId}/${project.version}")
+            artifactDirectory.mkdirs()
+            File targetJar = new File(artifactDirectory, "${module.artifactId}-${project.version}.jar")
+            java.nio.file.Files.copy(jarFile.toPath(), targetJar.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+
+            StringBuilder pom = new StringBuilder(512)
+            pom.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
+            pom.append("<project xmlns=\"http://maven.apache.org/POM/4.0.0\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd\">\n")
+            pom.append("  <modelVersion>4.0.0</modelVersion>\n")
+            pom.append("  <groupId>org.j7m</groupId>\n")
+            pom.append("  <artifactId>").append(module.artifactId).append("</artifactId>\n")
+            pom.append("  <version>").append(project.version).append("</version>\n")
+            List<String> moduleDependencies = module.dependencies as List<String>
+            if (!moduleDependencies.isEmpty()) {
+                pom.append("  <dependencies>\n")
+                moduleDependencies.each { String dependencyArtifactId ->
+                    pom.append("    <dependency>\n")
+                    pom.append("      <groupId>org.j7m</groupId>\n")
+                    pom.append("      <artifactId>").append(dependencyArtifactId).append("</artifactId>\n")
+                    pom.append("      <version>").append(project.version).append("</version>\n")
+                    pom.append("    </dependency>\n")
+                }
+                pom.append("  </dependencies>\n")
+            }
+            pom.append("</project>\n")
+            new File(artifactDirectory, "${module.artifactId}-${project.version}.pom").setText(pom.toString(), "UTF-8")
+        }
+    }
+}
+
+List<TaskProvider> annotationFirstCopyPasteProjectTasks = []
+Map<String, String> annotationFirstBasicCopyPasteExpectedTestPaths = [
+        "annotation-first-simple-service": "src/test/java/org/j7m/examples/annotation/simple/SimpleAnnotationApplicationTest.java",
+        "annotation-first-lifecycle": "src/test/java/org/j7m/examples/annotation/lifecycle/LifecycleAnnotationExampleTest.java"
+]
+annotationFirstBasicCopyPasteExamples.each { String example ->
+    String suffix = annotationFirstTaskSuffix(example)
+    Provider<Directory> copiedRoot = layout.buildDirectory.dir("tmp/annotation-first-copy-paste/${example}")
+    TaskProvider<Copy> copyTask = tasks.register("copy${suffix}BasicAnnotationExample", Copy) { Copy task ->
+        group = "verification"
+        description = "Copies the documented ${example} project files into a fresh bounded copy/paste validation directory."
+        dependsOn prepareAnnotationFirstBasicMavenRepository
+        from("examples/${example}") {
+            include "README.md"
+            include "build.gradle"
+            include "settings.gradle"
+            include "EXPECTED_OUTPUT.txt"
+            include "src/main/java/**"
+            include "src/main/resources/**"
+            include "src/test/java/**"
+            include "src/test/resources/**"
+        }
+        from(annotationFirstBasicMavenRepository) {
+            into "j7m-local-repository"
+        }
+        into(copiedRoot)
+        doFirst {
+            delete(copiedRoot)
+        }
+        doLast {
+            File copiedSourceRoot = copiedRoot.get().dir("src/main/java").asFile
+            List<File> copiedFiles = fileTree(copiedSourceRoot).matching {
+                include "**/*.java"
+            }.files.sort { File left, File right -> left.path <=> right.path }
+            if (copiedFiles.size() < 2 || copiedFiles.size() > 4) {
+                throw new GradleException("copy/paste validation for ${example} copied ${copiedFiles.size()} Java files; expected 2..4")
+            }
+            List<String> relativePaths = copiedFiles.collect { File copiedFile ->
+                return copiedSourceRoot.toPath().relativize(copiedFile.toPath()).toString().replace(File.separatorChar, "/" as char)
+            }
+            if (!relativePaths.contains("module-info.java")) {
+                throw new GradleException("copy/paste validation for ${example} did not copy module-info.java")
+            }
+            File copiedTestRoot = copiedRoot.get().dir("src/test/java").asFile
+            List<File> copiedTestFiles = fileTree(copiedTestRoot).matching {
+                include "**/*.java"
+            }.files.sort { File left, File right -> left.path <=> right.path }
+            if (copiedTestFiles.isEmpty()) {
+                throw new GradleException("copy/paste validation for ${example} copied no test Java sources")
+            }
+            String expectedTestPath = annotationFirstBasicCopyPasteExpectedTestPaths.get(example)
+            if (!copiedRoot.get().file(expectedTestPath).asFile.isFile()) {
+                throw new GradleException("copy/paste validation for ${example} did not copy expected test source ${expectedTestPath}")
+            }
+            File sourceManifest = file("examples/${example}/META-INF/j7m-application.json")
+            if (sourceManifest.isFile()) {
+                throw new GradleException("BASIC annotation example ${example} must not declare META-INF/j7m-application.json unless this validator packages and validates it through the production application-platform path")
+            }
+            if (copiedRoot.get().file("META-INF/j7m-application.json").asFile.isFile()) {
+                throw new GradleException("copy/paste validation for ${example} copied an unvalidated BASIC application manifest")
+            }
+            [
+                    "README.md",
+                    "build.gradle",
+                    "settings.gradle",
+                    "EXPECTED_OUTPUT.txt",
+                    "src/main/java/module-info.java"
+            ].each { String requiredPath ->
+                if (!copiedRoot.get().file(requiredPath).asFile.isFile()) {
+                    throw new GradleException("copy/paste validation for ${example} did not copy documented file ${requiredPath}")
+                }
+            }
+            File copiedRepository = copiedRoot.get().dir("j7m-local-repository").asFile
+            if (!copiedRepository.isDirectory()) {
+                throw new GradleException("copy/paste validation for ${example} did not prepare j7m-local-repository")
+            }
+            long copiedProjectBytes = 0L
+            fileTree(copiedRoot).matching {
+                exclude "j7m-local-repository/**"
+            }.files.each { File copiedFile ->
+                copiedProjectBytes += copiedFile.length()
+            }
+            long maxCopiedProjectBytes = 131072L
+            if (copiedProjectBytes > maxCopiedProjectBytes) {
+                throw new GradleException("copy/paste validation for ${example} copied ${copiedProjectBytes} project bytes; limit is ${maxCopiedProjectBytes}")
+            }
+            String copiedBuild = copiedRoot.get().file("build.gradle").asFile.getText("UTF-8")
+            [
+                    "implementation \"org.j7m:j7m-api:${project.version}\"",
+                    "implementation \"org.j7m:j7m-application-platform:${project.version}\"",
+                    "j7m-local-repository",
+                    "verifyExpectedOutput"
+            ].each { String requiredBuildMarker ->
+                if (!copiedBuild.contains(requiredBuildMarker)) {
+                    throw new GradleException("copy/paste validation for ${example} build.gradle missing required marker: ${requiredBuildMarker}")
+                }
+            }
+            [
+                    "project(",
+                    "sourceSets.main.output",
+                    "rootProject"
+            ].each { String forbiddenBuildMarker ->
+                if (copiedBuild.contains(forbiddenBuildMarker)) {
+                    throw new GradleException("copy/paste validation for ${example} build.gradle contains hidden root classpath or project dependency marker: ${forbiddenBuildMarker}")
+                }
+            }
+            String copiedReadme = copiedRoot.get().file("README.md").asFile.getText("UTF-8")
+            [
+                    "gradle build --no-daemon",
+                    "gradle verifyExpectedOutput --no-daemon",
+                    "DefaultJ7mInjector",
+                    "no `META-INF/j7m-application.json`"
+            ].each { String requiredCommand ->
+                if (!copiedReadme.contains(requiredCommand)) {
+                    throw new GradleException("copy/paste validation for ${example} README missing copied-project proof marker: ${requiredCommand}")
+                }
+            }
+            String copiedMainText = fileTree(copiedRoot.get().dir("src/main/java").asFile).matching {
+                include "**/*.java"
+            }.files.collect { File source ->
+                source.getText("UTF-8")
+                        .replaceAll("(?s)/\\*.*?\\*/", "")
+                        .replaceAll("(?m)//.*\$", "")
+            }.join("\n")
+            if (!copiedMainText.contains("DefaultJ7mInjector")) {
+                throw new GradleException("copy/paste validation for ${example} executable source does not use DefaultJ7mInjector")
+            }
+            if (example == "annotation-first-simple-service") {
+                if (copiedMainText.contains("new SimpleGreetingService(")) {
+                    throw new GradleException("simple BASIC smoke flow manually constructs SimpleGreetingService instead of using the public injector")
+                }
+                if (!copiedMainText.contains("invokeLifecycle(application, org.j7m.middleware.annotations.Startup.class)")) {
+                    throw new GradleException("simple BASIC smoke flow does not invoke startup through the public injector")
+                }
+            }
+            if (example == "annotation-first-lifecycle") {
+                [
+                        "component.initialize()",
+                        "component.startup()",
+                        "component.drain()",
+                        "component.shutdown()"
+                ].each { String manualLifecycleCall ->
+                    if (copiedMainText.contains(manualLifecycleCall)) {
+                        throw new GradleException("lifecycle BASIC smoke flow manually invokes lifecycle hook: ${manualLifecycleCall}")
+                    }
+                }
+                [
+                        "invokeLifecycle(component, Initialize.class)",
+                        "invokeLifecycle(component, Startup.class)",
+                        "invokeLifecycle(component, Drain.class)",
+                        "invokeLifecycle(component, Shutdown.class)"
+                ].each { String requiredLifecycleCall ->
+                    if (!copiedMainText.contains(requiredLifecycleCall)) {
+                        throw new GradleException("lifecycle BASIC smoke flow missing injector lifecycle invocation: ${requiredLifecycleCall}")
+                    }
+                }
+            }
+        }
+    }
+    TaskProvider<org.gradle.api.tasks.GradleBuild> projectTask = tasks.register("validate${suffix}BasicCopyPasteProject", org.gradle.api.tasks.GradleBuild) { org.gradle.api.tasks.GradleBuild task ->
+        group = "verification"
+        description = "Runs the documented build and EXPECTED_OUTPUT smoke commands in the fresh copied ${example} project."
+        dependsOn copyTask
+        dir = copiedRoot.get().asFile
+        tasks = ["build", "verifyExpectedOutput"]
+    }
+    annotationFirstCopyPasteProjectTasks.add(projectTask)
+}
+
+tasks.register("compileAnnotationFirstStandaloneExamples") {
+    group = "verification"
+    description = "Compiles every standalone annotation-first example main and test source tree without adding settings.gradle entries."
+    dependsOn annotationFirstStandaloneCompileTasks
+}
+
+tasks.register("validateAnnotationFirstBasicCopyPasteExamples") {
+    group = "verification"
+    description = "Validates bounded fresh-directory copy/paste project files, compilation, and smoke output for canonical basic annotation-first examples."
+    dependsOn annotationFirstCopyPasteProjectTasks
+}
+
+tasks.register("validateAnnotationExamples") {
+    group = "verification"
+    description = "Validates Phase 7.10 annotation-first examples, README coverage, compile gates, copy/paste gates, and executable demo coverage."
+    dependsOn ":j7m-examples:test"
+    dependsOn ":j7m-demo:runAnnotationModelDemo"
+    dependsOn "compileAnnotationFirstStandaloneExamples"
+    dependsOn annotationFirstStandaloneSmokeTasks
+    dependsOn "validateAnnotationFirstBasicCopyPasteExamples"
+    dependsOn "validateExampleJavadocs"
+    dependsOn "validateExampleSourceDocumentation"
+    doLast {
+        List<String> examples = annotationFirstStandaloneExamples
+        List<String> readmeSections = [
+                "Purpose",
+                "Architecture flow",
+                "Annotations demonstrated",
+                "Injected services demonstrated",
+                "Enforcement status",
+                "Prerequisites",
+                "Build",
+                "Test",
+                "Package",
+                "Run / demo",
+                "Verification",
+                "Expected output",
+                "Security notes",
+                "Redaction notes",
+                "Troubleshooting",
+                "Cleanup",
+                "Known limitations"
+        ]
+        examples.each { String example ->
+            File root = file("examples/${example}")
+            if (!root.isDirectory()) {
+                throw new GradleException("missing annotation-first example: ${example}")
+            }
+            List<String> requiredFiles = ["README.md", "build.gradle", "EXPECTED_OUTPUT.txt"]
+            if (!annotationFirstBasicCopyPasteExamples.contains(example)) {
+                requiredFiles.add("META-INF/j7m-application.json")
+            }
+            requiredFiles.each { String name ->
+                if (!new File(root, name).isFile()) {
+                    throw new GradleException("annotation-first example ${example} missing ${name}")
+                }
+            }
+            if (annotationFirstBasicCopyPasteExamples.contains(example)
+                    && new File(root, "META-INF/j7m-application.json").isFile()) {
+                throw new GradleException("BASIC annotation example ${example} must not declare META-INF/j7m-application.json unless validateAnnotationFirstBasicCopyPasteExamples validates production packaging")
+            }
+            File mainRoot = new File(root, "src/main/java")
+            File testRoot = new File(root, "src/test/java")
+            if (annotationFirstModularExamples.contains(example) && !new File(mainRoot, "module-info.java").isFile()) {
+                throw new GradleException("annotation-first example ${example} missing module-info.java")
+            }
+            if (fileTree(mainRoot).matching { include "**/*.java" }.files.size() < 2) {
+                throw new GradleException("annotation-first example ${example} has too little main source")
+            }
+            if (fileTree(testRoot).matching { include "**/*.java" }.files.isEmpty()) {
+                throw new GradleException("annotation-first example ${example} has no test source")
+            }
+            String readmeText = new File(root, "README.md").getText("UTF-8")
+            readmeSections.each { String section ->
+                if (!readmeText.contains("## ${section}")) {
+                    throw new GradleException("annotation-first README ${example} missing section ${section}")
+                }
+            }
+            if (!readmeText.contains("## Start Here")) {
+                throw new GradleException("annotation-first README ${example} missing Start Here section")
+            }
+            if (!readmeText.contains("## Safe modification exercise")) {
+                throw new GradleException("annotation-first README ${example} missing safe modification exercise")
+            }
+            if (!readmeText.contains("./gradlew validateAnnotationExamples --no-daemon")) {
+                throw new GradleException("annotation-first README ${example} missing current validation command")
+            }
+            if (!readmeText.contains("EXPECTED_OUTPUT.txt")) {
+                throw new GradleException("annotation-first README ${example} missing expected-output file reference")
+            }
+            String lowerReadme = readmeText.toLowerCase(java.util.Locale.ROOT)
+            ["external di", "spring", "guice", "cdi", "micronaut", "dagger", "generic exactly-once", "distributed acid"].each { String forbidden ->
+                boolean negated = lowerReadme.contains("no ${forbidden}")
+                        || lowerReadme.contains("not ${forbidden}")
+                        || lowerReadme.contains("does not ${forbidden}")
+                        || lowerReadme.contains("without ${forbidden}")
+                        || lowerReadme.contains("does not create a generic distributed transaction")
+                        || lowerReadme.contains("does not start a broker")
+                        || lowerReadme.contains("no external")
+                if (lowerReadme.contains(forbidden) && !negated) {
+                    throw new GradleException("annotation-first README ${example} contains forbidden overclaim or dependency: ${forbidden}")
+                }
+            }
+            fileTree(root).matching { include "**/*.java"; exclude "**/build/**" }.files.each { File source ->
+                String lowerSource = source.getText("UTF-8").toLowerCase(java.util.Locale.ROOT)
+                ["todo", "unsupportedoperationexception", "not implemented", "placeholder"].each { String marker ->
+                    if (lowerSource.contains(marker)) {
+                        throw new GradleException("annotation-first example ${example} contains source marker ${marker}: ${source}")
+                    }
+                }
+            }
+        }
+
+        File formerObservabilityService = file("examples/annotation-first-observability/src/main/java/org/j7m/examples/annotation/observability/ObservabilityService.java")
+        if (formerObservabilityService.exists()) {
+            throw new GradleException("annotation-first observability must not return to one overloaded ObservabilityService.java")
+        }
+        [
+                "examples/annotation-first-observability/src/main/java/org/j7m/examples/annotation/observability/workload/WorkloadAdmissionMetadata.java",
+                "examples/annotation-first-observability/src/main/java/org/j7m/examples/annotation/observability/routing/RoutingOrderingMetadata.java",
+                "examples/annotation-first-observability/src/main/java/org/j7m/examples/annotation/observability/recovery/RecoveryProgressCallbackMetadata.java",
+                "examples/annotation-first-observability/src/main/java/org/j7m/examples/annotation/observability/benchmark/ObservabilityBenchmarkMetadata.java"
+        ].each { String requiredPath ->
+            if (!file(requiredPath).isFile()) {
+                throw new GradleException("annotation-first observability missing focused source unit: ${requiredPath}")
+            }
+        }
+
+        String allAnnotationExampleText = annotationFirstStandaloneExamples.collect { String example ->
+            return fileTree("examples/${example}").matching {
+                include "**/*.java"
+                include "**/*.md"
+                include "**/*.txt"
+            }.files.collect { File source -> source.getText("UTF-8") }.join("\n")
+        }.join("\n").toLowerCase(java.util.Locale.ROOT)
+        ["active runtime support", "switches runtime levels", "runtime-level switching is active"].each { String forbidden ->
+            if (allAnnotationExampleText.contains(forbidden)) {
+                throw new GradleException("@SwitchLevel or reserved lifecycle documentation contains active-support claim: ${forbidden}")
+            }
+        }
+        [
+                "metadata-only annotations enforce",
+                "metadata-only annotation enforces",
+                "annotation itself enforces",
+                "annotation itself starts",
+                "annotation itself emits",
+                "annotation itself encrypts",
+                "annotations automatically enforce"
+        ].each { String forbidden ->
+            if (allAnnotationExampleText.contains(forbidden)) {
+                throw new GradleException("annotation examples contain metadata-only enforcement overclaim: ${forbidden}")
+            }
+        }
+
+        String exampleSource = fileTree("examples").matching {
+            include "annotation-first-*/src/main/java/**/*.java"
+            include "templates/annotation-first-service/src/main/java/**/*.java"
+        }.files.collect { File source -> source.getText("UTF-8") }.join("\n")
+        // These references execute generated-index/container/codec integration in j7m-examples:test.
+        Set<File> executableSources = fileTree("examples").matching {
+            include "annotation-first-*/src/main/java/**/*.java"
+            include "templates/annotation-first-service/src/main/java/**/*.java"
+        }.files + fileTree("j7m-examples/src/main/java/org/j7m/middleware/examples/annotation").matching {
+            include "ManagedAnnotationUsage.java", "ManagedUsageStyle.java", "ManagedUsageSettings.java", "ManagedUsagePayload.java"
+        }.files
+        String executableExampleSource = executableSources.collect { File source ->
+            source.getText("UTF-8")
+                    .replaceAll("(?s)/\\*.*?\\*/", "")
+                    .replaceAll("(?m)//.*\$", "")
+        }.join("\n")
+        List<String> annotations
+        URL[] apiClasses = project(":j7m-api").sourceSets.main.output.classesDirs.files.collect { it.toURI().toURL() } as URL[]
+        new URLClassLoader(apiClasses, (ClassLoader) null).withCloseable { loader ->
+            annotations = fileTree("j7m-api/src/main/java/org/j7m/middleware/annotations").matching {
+                include "*.java"
+            }.files.collect { it.name.replace(".java", "") }.findAll { name ->
+                Class<?> type = Class.forName("org.j7m.middleware.annotations." + name, false, loader)
+                type.isAnnotation() && java.lang.reflect.Modifier.isPublic(type.modifiers)
+            }.sort()
+        }
+        annotations.each { String annotationName ->
+            java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("(^|[\\s(,])@" + java.util.regex.Pattern.quote(annotationName) + "\\b", java.util.regex.Pattern.MULTILINE)
+            if (!pattern.matcher(executableExampleSource).find()) {
+                throw new GradleException("annotation-first examples missing concrete usage for @${annotationName}")
+            }
+        }
+
+        File coverage = file("documentation/docs/annotations/index.md")
+        if (!coverage.isFile()) {
+            throw new GradleException("missing public annotation reference")
+        }
+        String coverageText = coverage.getText("UTF-8")
+        String familyText = fileTree("documentation/docs/annotations").matching {
+            include "*.md"
+            exclude "index.md"
+        }.files.collect { it.getText("UTF-8") }.join("\n")
+        annotations.each { String name ->
+            if (!coverageText.contains("[@" + name + "](")) {
+                throw new GradleException("public annotation index missing @${name}")
+            }
+            String heading = "## @" + name + " {#"
+            int start = familyText.indexOf(heading)
+            int end = start < 0 ? -1 : familyText.indexOf("\n## ", start + heading.length())
+            String entry = start < 0 ? "" : familyText.substring(start, end < 0 ? familyText.length() : end)
+            if (!entry.contains("```java") || !entry.contains("@" + name)) {
+                throw new GradleException("public annotation reference lacks its own Java example for @${name}")
+            }
+        }
+
+        String rootReadme = file("README.md").getText("UTF-8")
+        [
+                "@Health",
+                "@Ready",
+                "@Streaming",
+                "@RetryPolicy",
+                "@HighPerformance",
+                "@Lease"
+        ].each { String obsoleteAnnotation ->
+            if (rootReadme.contains("`" + obsoleteAnnotation + "`")) {
+                throw new GradleException("README annotation glossary contains obsolete annotation name: ${obsoleteAnnotation}")
+            }
+        }
+        [
+                "@HealthCheck",
+                "@ReadinessCheck",
+                "@Retry",
+                "@Backpressure"
+        ].each { String currentAnnotation ->
+            if (!rootReadme.contains("`" + currentAnnotation + "`")) {
+                throw new GradleException("README annotation glossary missing current annotation name: ${currentAnnotation}")
+            }
+        }
+        [
+                "@Checkpoint`: recovery metadata",
+                "@Restore`: recovery metadata",
+                "@Async`: descriptor metadata",
+                "@HighAvailability`: descriptor metadata",
+                "@Benchmark`: descriptor metadata"
+        ].each { String requiredPhrase ->
+            if (!rootReadme.contains(requiredPhrase)) {
+                throw new GradleException("README annotation glossary missing metadata-only boundary phrase: ${requiredPhrase}")
+            }
+        }
+
+        String compiledExampleSource = fileTree("j7m-examples/src/main/java/org/j7m/middleware/examples/annotation").matching {
+            include "**/*.java"
+        }.files.collect { File source -> source.getText("UTF-8") }.join("\n")
+        ["AnnotationModelProcessor", "DefaultJ7mInjector", "AnnotationFirstExampleTest"].each { String token ->
+            String combined = compiledExampleSource + "\n" + file("j7m-examples/src/test/java/org/j7m/middleware/examples/annotation/AnnotationFirstExampleTest.java").getText("UTF-8")
+            if (!combined.contains(token)) {
+                throw new GradleException("compiled annotation examples missing executable coverage token: ${token}")
+            }
+        }
+        File demo = file("j7m-demo/src/main/java/org/j7m/middleware/demo/annotation/AnnotationModelDemo.java")
+        ["source-inventory coverage", "runtime-supported examples", "build metadata examples",
+         "metadata-only examples", "reserved annotations", "descriptor", "lifecycle",
+         "redaction", "security metadata", "idempotency metadata"].each { String token ->
+            if (!demo.getText("UTF-8").toLowerCase(java.util.Locale.ROOT).contains(token)) {
+                throw new GradleException("runAnnotationModelDemo source missing output token: ${token}")
+            }
+        }
+    }
+}
+
+tasks.register("validateExampleJavadocs") {
+    group = "verification"
+    description = "Validates professional Javadocs for annotation-first examples, templates, and demos."
+    dependsOn "validateExampleSourceDocumentation"
+    doLast {
+        List<File> sourceFiles = []
+        sourceFiles.addAll(fileTree("examples").matching {
+            include "annotation-first-*/src/main/java/**/*.java"
+            include "templates/annotation-first-service/src/main/java/**/*.java"
+            exclude "**/module-info.java"
+        }.files)
+        sourceFiles.addAll(fileTree("j7m-examples/src/main/java/org/j7m/middleware/examples/annotation").matching {
+            include "**/*.java"
+        }.files)
+        sourceFiles.add(file("j7m-demo/src/main/java/org/j7m/middleware/demo/annotation/AnnotationModelDemo.java"))
+        sourceFiles = sourceFiles.findAll { File source -> source.isFile() }.sort { File left, File right -> left.path <=> right.path }
+        if (sourceFiles.isEmpty()) {
+            throw new GradleException("no annotation example Java sources found for Javadoc validation")
+        }
+
+        List<String> placeholderPatterns = [
+                "Example class.",
+                "Demo service.",
+                "Gets the value.",
+                "Sets the value.",
+                "Handles request.",
+                "Main method.",
+                "TODO",
+                "TBD",
+                "Auto-generated",
+                "tag-only",
+                "placeholder"
+        ]
+        List<String> forbiddenClaims = [
+                "generic exactly-once guarantee",
+                "generic exactly-once delivery",
+                "generic exactly-once execution is provided",
+                "distributed ACID transaction",
+                "distributed acid transaction",
+                "certified adapter",
+                "certified compatibility",
+                "Phase 7"
+        ]
+
+        Closure<Boolean> hasJavadocBefore = { List<String> lines, int index ->
+            int cursor = index - 1
+            while (cursor >= 0) {
+                String trimmed = lines[cursor].trim()
+                if (trimmed.isEmpty() || trimmed.startsWith("@")) {
+                    cursor--
+                    continue
+                }
+                return trimmed.contains("*/")
+            }
+            return false
+        }
+        Closure<Boolean> hasOverrideBefore = { List<String> lines, int index ->
+            int cursor = index - 1
+            while (cursor >= 0) {
+                String trimmed = lines[cursor].trim()
+                if (trimmed.isEmpty()) {
+                    cursor--
+                    continue
+                }
+                if (trimmed.startsWith("@")) {
+                    if (trimmed.equals("@Override")) {
+                        return true
+                    }
+                    cursor--
+                    continue
+                }
+                return false
+            }
+            return false
+        }
+
+        Closure<Void> requireTerms = { File source, String text, String reason, List<String> terms ->
+            String lower = text.toLowerCase(java.util.Locale.ROOT)
+            terms.each { String term ->
+                if (!lower.contains(term.toLowerCase(java.util.Locale.ROOT))) {
+                    throw new GradleException("${source} Javadocs missing ${reason}: ${term}")
+                }
+            }
+        }
+
+        Closure<Void> validateSourceText = { File source, String text ->
+            placeholderPatterns.each { String pattern ->
+                if (text.contains(pattern)) {
+                    throw new GradleException("${source} contains placeholder Javadoc text: ${pattern}")
+                }
+            }
+            if (java.util.regex.Pattern.compile("(?s)/\\*\\*\\s*\\n\\s*\\*\\s*@(param|return|throws)[^/]*\\*/\\s*\\n\\s*public")
+                    .matcher(text)
+                    .find()) {
+                throw new GradleException("${source} contains tag-only Javadocs")
+            }
+            String lower = text.toLowerCase(java.util.Locale.ROOT)
+            String normalizedLower = lower
+                    .replaceAll("(?m)^\\s*\\*\\s?", " ")
+                    .replaceAll("\\s+", " ")
+            forbiddenClaims.each { String claim ->
+                if (normalizedLower.contains(claim.toLowerCase(java.util.Locale.ROOT))) {
+                    boolean negated = normalizedLower.contains("does not claim generic exactly-once")
+                            || normalizedLower.contains("does not provide generic exactly-once")
+                            || normalizedLower.contains("avoid distributed acid")
+                            || normalizedLower.contains("deliberately avoids distributed acid")
+                            || normalizedLower.contains("does not claim distributed acid")
+                            || normalizedLower.contains("not a certification")
+                            || normalizedLower.contains("no phase 7")
+                    if (!negated) {
+                        throw new GradleException("${source} contains forbidden positive claim: ${claim}")
+                    }
+                }
+            }
+            if (!text.contains("/**")) {
+                throw new GradleException("${source} has no Javadocs")
+            }
+            List<String> lines = text.readLines()
+            lines.eachWithIndex { String line, int index ->
+                String trimmed = line.trim()
+                boolean publicType = trimmed ==~ /public\s+(final\s+)?(class|record|interface)\s+.*/
+                boolean publicMethod = trimmed ==~ /public\s+(static\s+)?(final\s+)?[\w<>\[\].]+\s+\w+\s*\(.*/
+                boolean publicConstructor = trimmed ==~ /public\s+[A-Z][A-Za-z0-9_]*\s*\(.*/ || trimmed ==~ /public\s+[A-Z][A-Za-z0-9_]*\s*\{.*/
+                if ((publicType || publicMethod || publicConstructor)
+                        && !hasOverrideBefore(lines, index)
+                        && !hasJavadocBefore(lines, index)) {
+                    throw new GradleException("${source}:${index + 1} public declaration lacks meaningful Javadoc")
+                }
+            }
+
+            String executable = text
+                    .replaceAll("(?s)/\\*.*?\\*/", "")
+                    .replaceAll("(?m)//.*\$", "")
+            if (executable.contains("@Sensitive")) {
+                requireTerms(source, text, "@Sensitive redaction explanation", ["Sensitive", "redact"])
+            }
+            if (executable.contains("@RequiresRole") || executable.contains("@RequiresPermission")) {
+                requireTerms(source, text, "security annotation behavior", ["descriptor metadata", "authorization"])
+                if (source.path.contains("secure")) {
+                    requireTerms(source, text, "secure example authorized/denied behavior", ["denied"])
+                }
+            }
+            if (executable.contains("@Idempotent")
+                    || executable.contains("@Retry")
+                    || executable.contains("@Deadline")
+                    || executable.contains("@Backpressure")) {
+                requireTerms(source, text, "invocation semantic descriptor-only status", ["descriptor metadata"])
+            }
+            if (executable.contains("@DurableQueueConsumer")
+                    || executable.contains("@OutboxPublisher")
+                    || executable.contains("@InboxHandler")) {
+                requireTerms(source, text, "queue annotation limitations", ["descriptor metadata", "durable queue"])
+            }
+            if (executable.contains("@SagaDefinition")
+                    || executable.contains("@SagaStep")
+                    || executable.contains("@Compensation")
+                    || executable.contains("@DeadLetterHandler")) {
+                requireTerms(source, text, "saga annotation limitations", ["descriptor metadata"])
+            }
+            if (executable.contains("@IsolationProfile")) {
+                requireTerms(source, text, "isolation annotation limitations", ["descriptor metadata", "container", "os sandbox"])
+            }
+            if (executable.contains("@Initialize")
+                    || executable.contains("@Startup")
+                    || executable.contains("@Drain")
+                    || executable.contains("@Shutdown")
+                    || executable.contains("@HealthCheck")
+                    || executable.contains("@ReadinessCheck")) {
+                requireTerms(source, text, "lifecycle ordering", ["lifecycle", "order"])
+            }
+            if (executable.contains("@Inject")
+                    || executable.contains("@CurrentApplication")
+                    || executable.contains("@CurrentInvocation")
+                    || executable.contains("@CurrentPrincipal")
+                    || executable.contains("@J7mResource")
+                    || executable.contains("@ConfigValue")) {
+                requireTerms(source, text, "injection behavior", ["inject"])
+            }
+            if (source.path.endsWith("AnnotationModelDemo.java")) {
+                requireTerms(source, text, "annotation demo purpose and interpretation", [
+                        "developer",
+                        "descriptor processing",
+                        "injection",
+                        "lifecycle",
+                        "redaction",
+                        "descriptor-only",
+                        "production runtime",
+                        "external services",
+                        "output"
+                ])
+            }
+        }
+
+        sourceFiles.each { File source ->
+            validateSourceText(source, source.getText("UTF-8"))
+        }
+
+        [
+                "examples/annotation-first-secure-service/src/main/java/org/j7m/examples/annotation/secure/SecureApprovalService.java",
+                "examples/annotation-first-lifecycle/src/main/java/org/j7m/examples/annotation/lifecycle/LifecycleComponent.java",
+                "examples/annotation-first-durable-queue-consumer/src/main/java/org/j7m/examples/annotation/queue/QueueConsumer.java",
+                "examples/annotation-first-saga-workflow/src/main/java/org/j7m/examples/annotation/saga/InvoiceSagaWorkflow.java",
+                "examples/annotation-first-isolation-profile/src/main/java/org/j7m/examples/annotation/isolation/IsolatedReportService.java",
+                "examples/annotation-first-remote-invocation/src/main/java/org/j7m/examples/annotation/remote/RemoteInvocationService.java",
+                "examples/annotation-first-security-audit/src/main/java/org/j7m/examples/annotation/securityaudit/SecurityAuditService.java",
+                "examples/annotation-first-observability/src/main/java/org/j7m/examples/annotation/observability/workload/WorkloadAdmissionMetadata.java",
+                "examples/annotation-first-observability/src/main/java/org/j7m/examples/annotation/observability/routing/RoutingOrderingMetadata.java",
+                "examples/annotation-first-observability/src/main/java/org/j7m/examples/annotation/observability/recovery/RecoveryProgressCallbackMetadata.java",
+                "examples/annotation-first-observability/src/main/java/org/j7m/examples/annotation/observability/benchmark/ObservabilityBenchmarkMetadata.java",
+                "j7m-demo/src/main/java/org/j7m/middleware/demo/annotation/AnnotationModelDemo.java"
+        ].each { String requiredPath ->
+            if (!file(requiredPath).isFile()) {
+                throw new GradleException("missing required annotation example Javadoc source: ${requiredPath}")
+            }
+        }
+
+        Closure<Void> expectFailure = { String name, String text ->
+            try {
+                validateSourceText(new File(temporaryDir, name), text)
+            } catch (GradleException expected) {
+                return
+            }
+            throw new GradleException("synthetic invalid example Javadocs passed validation: ${name}")
+        }
+
+        expectFailure("placeholder.java", "/** Example class. */\npublic final class Bad { }\n")
+        expectFailure("tag-only.java", "/**\n * @return value\n */\npublic String value() { return \"\"; }\n")
+        expectFailure("overclaim.java", "/** Provides a generic exactly-once guarantee. */\npublic final class Bad { }\n")
+        expectFailure("sensitive.java", "/** Uses @Sensitive without explaining output. */\n@Sensitive public String secret() { return \"\"; }\n")
+        expectFailure("lifecycle.java", "/** Uses lifecycle hooks. */\n@Startup public void start() { }\n")
+        expectFailure("queue.java", "/** Queue handler. */\n@DurableQueueConsumer public String handle() { return \"\"; }\n")
+        expectFailure("saga.java", "/** Saga handler. */\n@SagaStep public String step() { return \"\"; }\n")
+        expectFailure("isolation.java", "/** Isolation handler. */\n@IsolationProfile public String run() { return \"\"; }\n")
+        expectFailure("AnnotationModelDemo.java", "/** Runnable annotation demo. */\npublic final class AnnotationModelDemo {\n/** Runs the annotation model demonstration. */\npublic static void main(String[] args) { }\n}\n")
+    }
+}
+
+tasks.register("validateExampleSourceDocumentation") {
+    group = "verification"
+    description = "Validates teaching comments inside developer-facing demo and example source flows."
+    doLast {
+        List<File> sourceFiles = []
+        sourceFiles.addAll(fileTree("j7m-demo/src/main/java").matching {
+            include "**/*.java"
+        }.files)
+        sourceFiles.addAll(fileTree("examples").matching {
+            include "annotation-first-*/src/main/java/**/*.java"
+            include "templates/annotation-first-service/src/main/java/**/*.java"
+            exclude "**/module-info.java"
+        }.files)
+        sourceFiles.addAll(fileTree("j7m-examples/src/main/java/org/j7m/middleware/examples/annotation").matching {
+            include "**/*.java"
+        }.files)
+        sourceFiles = sourceFiles.findAll { File source -> source.isFile() && source.name != "module-info.java" }
+                .sort { File left, File right -> left.path <=> right.path }
+        if (sourceFiles.isEmpty()) {
+            throw new GradleException("no developer-facing demo/example sources found for source documentation validation")
+        }
+
+        Closure<Boolean> safeForbiddenContext = { String lower ->
+            return lower.contains("does not claim")
+                    || lower.contains("does not provide")
+                    || lower.contains("not provide")
+                    || lower.contains("without claiming")
+                    || lower.contains("deliberately avoids")
+                    || lower.contains("not a certification")
+                    || lower.contains("no phase 7")
+                    || lower.contains("phase 7.0-7.4")
+        }
+        Closure<String> commentText = { String text ->
+            return text.readLines().findAll { String line ->
+                String trimmed = line.trim()
+                return trimmed.startsWith("//") || trimmed.startsWith("*") || trimmed.startsWith("/*")
+            }.join("\n")
+        }
+        Closure<String> methodBody = { String text, String signature ->
+            int signatureIndex = text.indexOf(signature)
+            if (signatureIndex < 0) {
+                return ""
+            }
+            int openBrace = text.indexOf("{", signatureIndex)
+            if (openBrace < 0) {
+                return ""
+            }
+            int depth = 0
+            for (int index = openBrace; index < text.length(); index++) {
+                char character = text.charAt(index)
+                if (character == "{" as char) {
+                    depth++
+                } else if (character == "}" as char) {
+                    depth--
+                    if (depth == 0) {
+                        return text.substring(openBrace + 1, index)
+                    }
+                }
+            }
+            return text.substring(openBrace + 1)
+        }
+        Closure<List<String>> teachingCommentLines = { String comments ->
+            return comments.readLines()
+                    .collect { String line -> line.trim() }
+                    .findAll { String line -> line.contains("J7M teaching:") }
+        }
+        Closure<Void> validateTeachingLineQuality = { String name, String comments, int minimumCount ->
+            List<String> teachingLines = teachingCommentLines(comments)
+            if (teachingLines.size() < minimumCount) {
+                throw new GradleException("${name} has ${teachingLines.size()} method-flow teaching comments; expected at least ${minimumCount}")
+            }
+            List<String> normalized = teachingLines.collect { String line -> line.replaceAll("\\s+", " ").trim() }
+            if (normalized.unique().size() != normalized.size()) {
+                throw new GradleException("${name} repeats identical teaching comments instead of explaining distinct demo blocks")
+            }
+            List<String> verbs = [
+                    "demonstrate", "demonstrates", "prove", "proves", "show", "shows",
+                    "keep", "keeps", "reject", "rejects", "preserve", "preserves",
+                    "teach", "teaches", "record", "records", "produce", "produces",
+                    "guard", "guards", "avoid", "avoids", "drive", "drives",
+                    "distinguish", "distinguishes", "verify", "verifies", "compare",
+                    "compared", "reports", "report", "starts", "creates"
+            ]
+            teachingLines.each { String line ->
+                String lower = line.toLowerCase(java.util.Locale.ROOT)
+                String body = lower.replace("//", "").replace("j7m teaching:", "").trim()
+                if (body.length() < 35) {
+                    throw new GradleException("${name} has a too-short teaching comment: ${line}")
+                }
+                int conceptHits = 0
+                ["adversarial", "leader", "safety", "lease", "fencing", "watch", "saga",
+                 "compensation", "recovery", "digest", "conflict", "repair", "redaction",
+                 "policy", "container", "exactly-once", "acid"].each { String term ->
+                    if (body.contains(term)) {
+                        conceptHits++
+                    }
+                }
+                boolean hasVerb = verbs.any { String verb -> body.contains(verb) }
+                if (conceptHits >= 4 && !hasVerb) {
+                    throw new GradleException("${name} contains keyword-list teaching text without explanatory prose: ${line}")
+                }
+            }
+        }
+        Closure<Void> requireTeachingConcepts = { String name, String comments, List<List<String>> conceptGroups ->
+            String lower = comments.toLowerCase(java.util.Locale.ROOT)
+            conceptGroups.each { List<String> alternatives ->
+                boolean present = alternatives.any { String term -> lower.contains(term) }
+                if (!present) {
+                    throw new GradleException("${name} method-flow teaching comments missing one of: ${alternatives}")
+                }
+            }
+        }
+        String phase1Source = "j7m-demo/src/main/java/org/j7m/middleware/demo/Phase1Demo.java"
+        List<Map<String, Object>> demoTaskInventory = [
+                [taskName: "run", mainClass: "org.j7m.middleware.demo.Phase1Demo", sourceFile: phase1Source,
+                 signatures: ["public static void main", "private static void runTransport", "private static void runMulticastAndHp", "private static void runBootstrapFallback"],
+                 classification: "legacy Phase 1/2 developer-visible demo", minimumTeachingComments: 4,
+                 concepts: [["dispatcher"], ["transport"], ["objectref", "objectref"], ["callback"], ["failover"], ["multicast"], ["bootstrap"]]],
+                [taskName: "runUdpMulticastDemo", mainClass: "org.j7m.middleware.demo.Phase1Demo", sourceFile: phase1Source,
+                 signatures: ["private static void runUdpMulticastOnly", "private static void runMulticastDemo"],
+                 classification: "legacy Phase 2 developer-visible demo", minimumTeachingComments: 3,
+                 concepts: [["udp"], ["multicast"], ["deterministic"], ["fallback"], ["external network", "network services"]]],
+                [taskName: "runSecurityDemo", mainClass: "org.j7m.middleware.demo.Phase1Demo", sourceFile: phase1Source,
+                 signatures: ["private static void runSecurityDemo"], classification: "legacy Phase 3 developer-visible demo",
+                 minimumTeachingComments: 3, concepts: [["security context"], ["caller identity"], ["redaction"], ["insecure transport"], ["configuration guard"]]],
+                [taskName: "runMtlsSecurityDemo", mainClass: "org.j7m.middleware.demo.Phase1Demo", sourceFile: phase1Source,
+                 signatures: ["private static void runMtlsSecurityDemo"], classification: "legacy Phase 3.1 developer-visible demo",
+                 minimumTeachingComments: 1, concepts: [["mtls"], ["trusted"], ["untrusted"], ["audit"]]],
+                [taskName: "runWorkloadDemo", mainClass: "org.j7m.middleware.demo.Phase1Demo", sourceFile: phase1Source,
+                 signatures: ["private static void runWorkloadDemo"], classification: "legacy Phase 4 developer-visible demo",
+                 minimumTeachingComments: 2, concepts: [["leasing"], ["fencing"], ["scheduler"], ["exactly-once"]]],
+                [taskName: "runStreamingWorkloadDemo", mainClass: "org.j7m.middleware.demo.Phase1Demo", sourceFile: phase1Source,
+                 signatures: ["private static void runStreamingWorkloadDemo"], classification: "legacy Phase 4.1 developer-visible demo",
+                 minimumTeachingComments: 1, concepts: [["streaming"], ["objectref"], ["fan-out"], ["scatter"], ["durable queue"]]],
+                [taskName: "runComplianceDemo", mainClass: "org.j7m.middleware.demo.Phase1Demo", sourceFile: phase1Source,
+                 signatures: ["private static void runComplianceDemo"], classification: "legacy Phase 5 developer-visible demo",
+                 minimumTeachingComments: 1, concepts: [["compliance evidence"], ["crypto posture"], ["tamper"], ["certification"]]],
+                [taskName: "runEnterpriseReadinessDemo", mainClass: "org.j7m.middleware.demo.Phase1Demo", sourceFile: phase1Source,
+                 signatures: ["private static void runComplianceDemo"], classification: "legacy Phase 5.1 developer-visible demo",
+                 minimumTeachingComments: 1, concepts: [["compliance evidence"], ["crypto posture"], ["tamper"], ["certification"]]],
+                [taskName: "runApplicationDeploymentDemo", mainClass: "org.j7m.middleware.demo.Phase1Demo", sourceFile: phase1Source,
+                 signatures: ["private static void runApplicationDeploymentDemo"], classification: "application-platform acceptance demo",
+                 minimumTeachingComments: 1, concepts: [["packaging"], ["verify", "verification"], ["activation"], ["lookup"], ["cleanup"]]],
+                [taskName: "runModularApplicationDeploymentDemo", mainClass: "org.j7m.middleware.demo.Phase1Demo", sourceFile: phase1Source,
+                 signatures: ["private static void runModularApplicationDeploymentDemo"], classification: "application-platform JPMS demo",
+                 minimumTeachingComments: 1, concepts: [["jpms"], ["modulelayer"], ["objectref"]]],
+                [taskName: "runApplicationUpgradeRollbackDemo", mainClass: "org.j7m.middleware.demo.Phase1Demo", sourceFile: phase1Source,
+                 signatures: ["private static void runApplicationUpgradeRollbackDemo"], classification: "application-platform upgrade demo",
+                 minimumTeachingComments: 2, concepts: [["upgrade"], ["rollback"], ["unsupported"]]],
+                [taskName: "runRollingUpgradeDemo", mainClass: "org.j7m.middleware.demo.Phase1Demo", sourceFile: phase1Source,
+                 signatures: ["private static void runUpgradeStrategyDemo"], classification: "application-platform upgrade strategy demo",
+                 minimumTeachingComments: 1, concepts: [["strategy"], ["rollback"], ["local"]]],
+                [taskName: "runBlueGreenUpgradeDemo", mainClass: "org.j7m.middleware.demo.Phase1Demo", sourceFile: phase1Source,
+                 signatures: ["private static void runUpgradeStrategyDemo"], classification: "application-platform upgrade strategy demo",
+                 minimumTeachingComments: 1, concepts: [["strategy"], ["rollback"], ["local"]]],
+                [taskName: "runCanaryBaselineUpgradeDemo", mainClass: "org.j7m.middleware.demo.Phase1Demo", sourceFile: phase1Source,
+                 signatures: ["private static void runUpgradeStrategyDemo"], classification: "application-platform upgrade strategy demo",
+                 minimumTeachingComments: 1, concepts: [["strategy"], ["rollback"], ["local"]]],
+                [taskName: "runApplicationFailureDiagnosticsDemo", mainClass: "org.j7m.middleware.demo.Phase1Demo", sourceFile: phase1Source,
+                 signatures: ["private static void runApplicationFailureDiagnosticsDemo"], classification: "application-platform diagnostics demo",
+                 minimumTeachingComments: 1, concepts: [["diagnostics"], ["safe messages", "safe"], ["registry cleanup"]]],
+                [taskName: "runApplicationAdminStatusDemo", mainClass: "org.j7m.middleware.demo.Phase1Demo", sourceFile: phase1Source,
+                 signatures: ["private static void runApplicationAdminStatusDemo"], classification: "application-platform operations demo",
+                 minimumTeachingComments: 1, concepts: [["admin-status", "admin status"], ["operator-facing"], ["upgrade history"], ["audit"]]],
+                [taskName: "runHelloRemoteServiceExample", mainClass: "org.j7m.middleware.demo.Phase1Demo", sourceFile: phase1Source,
+                 signatures: ["private static void runHelloRemoteServiceExample"], classification: "example smoke demo",
+                 minimumTeachingComments: 2, concepts: [["bundle"], ["verify"], ["lookup"], ["unload"], ["objectref"]]],
+                [taskName: "runCallbacksAndEventsExample", mainClass: "org.j7m.middleware.demo.Phase1Demo", sourceFile: phase1Source,
+                 signatures: ["private static void runCallbacksAndEventsExample", "private static void runCallbackExampleForTransport"],
+                 classification: "example smoke demo", minimumTeachingComments: 2,
+                 concepts: [["callback"], ["objectref"], ["transport"], ["business code", "transport-specific plumbing"]]],
+                [taskName: "runSecureBankingWorkflowExample", mainClass: "org.j7m.middleware.demo.Phase1Demo", sourceFile: phase1Source,
+                 signatures: ["private static void runSecureBankingWorkflowExample"], classification: "example smoke demo",
+                 minimumTeachingComments: 2, concepts: [["authorization"], ["denied"], ["redacted"], ["caller"]]],
+                [taskName: "runHaHpClusterExample", mainClass: "org.j7m.middleware.demo.Phase1Demo", sourceFile: phase1Source,
+                 signatures: ["private static void runHaHpClusterExample"], classification: "example smoke demo",
+                 minimumTeachingComments: 2, concepts: [["ha/hp", "hp"], ["selection"], ["failover"], ["consensus"]]],
+                [taskName: "runWorkloadProcessingExample", mainClass: "org.j7m.middleware.demo.Phase1Demo", sourceFile: phase1Source,
+                 signatures: ["private static void runWorkloadProcessingExample"], classification: "example smoke demo",
+                 minimumTeachingComments: 2, concepts: [["workload"], ["checkpoint"], ["fencing"], ["cancellation"]]],
+                [taskName: "runStreamingPipelineExample", mainClass: "org.j7m.middleware.demo.Phase1Demo", sourceFile: phase1Source,
+                 signatures: ["private static void runStreamingPipelineExample"], classification: "example smoke demo",
+                 minimumTeachingComments: 2, concepts: [["streaming"], ["backpressure"], ["oversized"], ["cleanup"], ["exactly-once"]]],
+                [taskName: "runRegulatedEnterpriseAppExample", mainClass: "org.j7m.middleware.demo.Phase1Demo", sourceFile: phase1Source,
+                 signatures: ["private static void runRegulatedEnterpriseAppExample"], classification: "example smoke demo",
+                 minimumTeachingComments: 2, concepts: [["sbom"], ["provenance"], ["signature"], ["certification"]]],
+                [taskName: "runGradlePluginWorkflowDemo", mainClass: "build-script", sourceFile: "j7m-demo/build.gradle",
+                 classification: "support smoke demo", supportOnly: true],
+                [taskName: "runDeployerCliWorkflowDemo", mainClass: "build-script", sourceFile: "j7m-demo/build.gradle",
+                 classification: "support smoke demo", supportOnly: true],
+                [taskName: "runDeployerCliUpgradeRollbackDemo", mainClass: "build-script", sourceFile: "j7m-demo/build.gradle",
+                 classification: "support smoke demo", supportOnly: true],
+                [taskName: "runDurableLogCrashRecoveryDemo", mainClass: "org.j7m.middleware.demo.durablelog.DurableLogCrashRecoveryDemo",
+                 sourceFile: "j7m-demo/src/main/java/org/j7m/middleware/demo/durablelog/DurableLogCrashRecoveryDemo.java",
+                 signatures: ["public static void main"], classification: "current Phase 6 acceptance demo",
+                 minimumTeachingComments: 2, concepts: [["recovery"], ["truncation", "damage"], ["safe operational", "status"]]],
+                [taskName: "runDurableQueueDemo", mainClass: "org.j7m.middleware.demo.messaging.DurableQueueDemo",
+                 sourceFile: "j7m-demo/src/main/java/org/j7m/middleware/demo/messaging/DurableQueueDemo.java",
+                 signatures: ["public static void main"], classification: "current Phase 6 acceptance demo",
+                 minimumTeachingComments: 2, concepts: [["enqueue"], ["lease"], ["ack", "nack"], ["outbox", "inbox"], ["external broker"], ["exactly-once"]]],
+                [taskName: "runCoordinationDemo", mainClass: "org.j7m.middleware.demo.coordination.CoordinationDemo",
+                 sourceFile: "j7m-demo/src/main/java/org/j7m/middleware/demo/coordination/CoordinationDemo.java",
+                 signatures: ["public static void main"], classification: "current Phase 6 acceptance demo",
+                 minimumTeachingComments: 3, concepts: [["membership", "liveness"], ["lease"], ["fencing token"], ["compare-and-set", "cas"], ["watch", "notification"], ["stale owner", "split-brain"]]],
+                [taskName: "runConsensusSimulationDemo", mainClass: "org.j7m.middleware.demo.consensus.ConsensusSimulationDemo",
+                 sourceFile: "j7m-demo/src/main/java/org/j7m/middleware/demo/consensus/ConsensusSimulationDemo.java",
+                 signatures: ["public static void main"], classification: "current Phase 6 acceptance demo",
+                 minimumTeachingComments: 3, concepts: [["adversarial"], ["leader election"], ["stale leader"], ["majority", "quorum"], ["safety invariant"], ["exactly-once", "acid"]]],
+                [taskName: "runRepositoryReplicationDemo", mainClass: "org.j7m.middleware.demo.repository.RepositoryReplicationDemo",
+                 sourceFile: "j7m-demo/src/main/java/org/j7m/middleware/demo/repository/RepositoryReplicationDemo.java",
+                 signatures: ["public static void main"], classification: "current Phase 6 acceptance demo",
+                 minimumTeachingComments: 4, concepts: [["digest", "exact"], ["signature", "sbom", "provenance"], ["promotion", "rollback"], ["conflict"], ["repair", "reconciliation"], ["verification-policy", "verification policy"], ["object store", "cloud sdk"]]],
+                [taskName: "runSagaDemo", mainClass: "org.j7m.middleware.demo.saga.SagaDemo",
+                 sourceFile: "j7m-demo/src/main/java/org/j7m/middleware/demo/saga/SagaDemo.java",
+                 signatures: ["public static void main"], classification: "current Phase 6 acceptance demo",
+                 minimumTeachingComments: 6, concepts: [["saga definition"], ["ordered step"], ["compensation"], ["retry", "timeout"], ["dead-letter", "recovery"], ["acid", "xa"], ["exactly-once"]]],
+                [taskName: "runIsolationDemo", mainClass: "org.j7m.middleware.demo.isolation.IsolationDemo",
+                 sourceFile: "j7m-demo/src/main/java/org/j7m/middleware/demo/isolation/IsolationDemo.java",
+                 signatures: ["private static void runParentDemo"], classification: "current Phase 6 acceptance demo",
+                 minimumTeachingComments: 3, concepts: [["in-process policy"], ["local process"], ["filesystem", "network", "environment"], ["stdout", "stderr", "capture"], ["redact", "redaction"], ["advisory", "policy-only", "enforced"], ["container", "os sandbox"]]],
+                [taskName: "runAdapterTckDemo", mainClass: "org.j7m.middleware.demo.adapter.AdapterTckDemo",
+                 sourceFile: "j7m-demo/src/main/java/org/j7m/middleware/demo/adapter/AdapterTckDemo.java",
+                 signatures: ["public static void main"], classification: "current Phase 6 acceptance demo",
+                 minimumTeachingComments: 1, concepts: [["fake providers"], ["production vendor adapter"], ["external service"]]],
+                [taskName: "runAnnotationModelDemo", mainClass: "org.j7m.middleware.demo.annotation.AnnotationModelDemo",
+                 sourceFile: "j7m-demo/src/main/java/org/j7m/middleware/demo/annotation/AnnotationModelDemo.java",
+                 signatures: ["public static void main"], classification: "Phase 6.11 annotation model demo",
+                 minimumTeachingComments: 4, concepts: [["descriptor"], ["injection"], ["lifecycle"], ["redaction"], ["runtime internals"], ["descriptor-only"]]],
+                [taskName: "runNuggetAdminDemo", mainClass: "org.j7m.middleware.demo.operations.NuggetOperationsDemo",
+                 sourceFile: "j7m-demo/src/main/java/org/j7m/middleware/demo/operations/NuggetOperationsDemo.java",
+                 signatures: ["private static void runAdminDemo"], classification: "current Phase 7.0-7.10 nugget operations demo",
+                 minimumTeachingComments: 3, concepts: [["pin"], ["admission", "auth"], ["discovery"], ["remote transport", "deferred"], ["audit"]]],
+                [taskName: "runNuggetCliDemo", mainClass: "org.j7m.middleware.demo.operations.NuggetOperationsDemo",
+                 sourceFile: "j7m-demo/src/main/java/org/j7m/middleware/demo/operations/NuggetOperationsDemo.java",
+                 signatures: ["private static void runCliDemo"], classification: "current Phase 7.0-7.10 nugget CLI prompt and target demo",
+                 minimumTeachingComments: 2, concepts: [["cli"], ["production-entrypoint", "production entrypoint"], ["target"], ["status"], ["json"], ["diagnostics"]]],
+                [taskName: "runNuggetCliApplicationLifecycleDemo", mainClass: "org.j7m.middleware.demo.operations.NuggetOperationsDemo",
+                 sourceFile: "j7m-demo/src/main/java/org/j7m/middleware/demo/operations/NuggetOperationsDemo.java",
+                 signatures: ["private static void runNuggetCliApplicationLifecycleDemo"], classification: "Phase 7.6 lifecycle demo",
+                 minimumTeachingComments: 2, concepts: [["lifecycle"], ["start"], ["dry-run"], ["drain"], ["stop"], ["unload"], ["audit"], ["redaction"]]],
+                [taskName: "runNuggetCliKillDisabledDemo", mainClass: "org.j7m.middleware.demo.operations.NuggetOperationsDemo",
+                 sourceFile: "j7m-demo/src/main/java/org/j7m/middleware/demo/operations/NuggetOperationsDemo.java",
+                 signatures: ["private static void runNuggetCliKillDisabledDemo"], classification: "Phase 7.7 shutdown and kill-disabled demo",
+                 minimumTeachingComments: 2, concepts: [["kill"], ["disabled"], ["confirmation"], ["audit"], ["redaction"]]],
+                [taskName: "runNuggetCliPinFailureDemo", mainClass: "org.j7m.middleware.demo.operations.NuggetOperationsDemo",
+                 sourceFile: "j7m-demo/src/main/java/org/j7m/middleware/demo/operations/NuggetOperationsDemo.java",
+                 signatures: ["private static void runPinFailureDemo"], classification: "current Phase 7.0-7.10 nugget CLI PIN rejection demo",
+                 minimumTeachingComments: 2, concepts: [["pin"], ["rejected", "rejection"], ["cli"], ["secret"], ["audit"]]]
+        ]
+        Closure<Set<String>> registeredRunTasksFrom = { String demoBuildText ->
+            Set<String> registeredRunTasks = []
+            java.util.regex.Matcher taskMatcher = java.util.regex.Pattern
+                    .compile("tasks\\.register\\(\\s*['\\\"](run[A-Za-z0-9]+)['\\\"]")
+                    .matcher(demoBuildText)
+            while (taskMatcher.find()) {
+                registeredRunTasks.add(taskMatcher.group(1))
+            }
+            return registeredRunTasks
+        }
+        Closure<Void> validateDemoTaskInventoryRows = { Set<String> registeredRunTasks, List<Map<String, Object>> inventoryRows ->
+            Map<String, Integer> taskCounts = [:]
+            inventoryRows.each { Map<String, Object> row ->
+                String taskName = row.taskName as String
+                taskCounts[taskName] = taskCounts.getOrDefault(taskName, 0) + 1
+            }
+            List<String> duplicateTasks = taskCounts.findAll { String taskName, Integer count -> count > 1 }.keySet().toList().sort()
+            if (!duplicateTasks.isEmpty()) {
+                throw new GradleException("demo task inventory contains duplicate task rows: ${duplicateTasks}")
+            }
+            Set<String> inventoriedTasks = inventoryRows.collect { Map<String, Object> row -> row.taskName as String }.toSet()
+            List<String> missingInventory = registeredRunTasks.findAll { String taskName -> !inventoriedTasks.contains(taskName) }.sort()
+            if (!missingInventory.isEmpty()) {
+                throw new GradleException("demo task inventory missing run tasks: ${missingInventory}")
+            }
+            inventoryRows.each { Map<String, Object> row ->
+                String taskName = row.taskName as String
+                if (taskName == null || taskName.isBlank()) {
+                    throw new GradleException("demo task inventory row is missing task name")
+                }
+                if ((row.mainClass as String) == null || (row.mainClass as String).isBlank()) {
+                    throw new GradleException("demo task inventory maps ${taskName} without main class metadata")
+                }
+                if ((row.sourceFile as String) == null || (row.sourceFile as String).isBlank()) {
+                    throw new GradleException("demo task inventory maps ${taskName} without source file metadata")
+                }
+                if ((row.classification as String) == null || (row.classification as String).isBlank()) {
+                    throw new GradleException("demo task inventory maps ${taskName} without classification metadata")
+                }
+                if (taskName != "run" && !registeredRunTasks.contains(taskName)) {
+                    throw new GradleException("demo task inventory references missing j7m-demo task: ${taskName}")
+                }
+                if (row.supportOnly) {
+                    if (!(row.classification as String).contains("support smoke")) {
+                        throw new GradleException("support-only demo task lacks support smoke classification: ${taskName}")
+                    }
+                    return
+                }
+                File source = file(row.sourceFile as String)
+                if (!source.isFile()) {
+                    throw new GradleException("demo task inventory maps ${taskName} to missing source file: ${source}")
+                }
+                if ((row.signatures as List<String>).isEmpty()) {
+                    throw new GradleException("demo task inventory maps ${taskName} without method-flow signatures")
+                }
+                if ((row.concepts as List<List<String>>) == null || (row.concepts as List<List<String>>).isEmpty()) {
+                    throw new GradleException("demo task inventory maps ${taskName} without intended concepts")
+                }
+                if (!(row.minimumTeachingComments instanceof Number) || (row.minimumTeachingComments as int) <= 0) {
+                    throw new GradleException("demo task inventory maps ${taskName} without teaching-comment requirement")
+                }
+                String sourceText = source.getText("UTF-8")
+                String simpleClassName = (row.mainClass as String).tokenize(".").last()
+                if (!sourceText.contains("class ${simpleClassName}") && !sourceText.contains("interface ${simpleClassName}")) {
+                    throw new GradleException("demo task inventory maps ${taskName} to stale source file: ${source}")
+                }
+                (row.signatures as List<String>).each { String signature ->
+                    if (!sourceText.contains(signature)) {
+                        throw new GradleException("demo task inventory maps ${taskName} to stale source missing signature: ${signature}")
+                    }
+                }
+            }
+        }
+        Closure<Void> validateDemoTaskInventory = {
+            File demoBuild = file("j7m-demo/build.gradle")
+            if (!demoBuild.isFile()) {
+                throw new GradleException("missing j7m-demo/build.gradle for demo task inventory validation")
+            }
+            validateDemoTaskInventoryRows(registeredRunTasksFrom(demoBuild.getText("UTF-8")), demoTaskInventory)
+        }
+        Closure<Void> validateDemoMethodRequirements = { String name, String text ->
+            String fileName = new File(name).name
+            String normalizedName = name.replace(File.separatorChar, '/' as char)
+            List<Map<String, Object>> rows = demoTaskInventory.findAll { Map<String, Object> row ->
+                if (row.supportOnly) {
+                    return false
+                }
+                String sourceFile = (row.sourceFile as String).replace(File.separatorChar, '/' as char)
+                return normalizedName.endsWith(sourceFile) || new File(sourceFile).name == fileName
+            }
+            if (rows.isEmpty()) {
+                return
+            }
+            rows.each { Map<String, Object> requirements ->
+                StringBuilder methodFlow = new StringBuilder()
+                (requirements.signatures as List<String>).each { String signature ->
+                    String body = methodBody(text, signature)
+                    if (body.isEmpty()) {
+                        throw new GradleException("${name} missing required demo method body for ${requirements.taskName} signature: ${signature}")
+                    }
+                    methodFlow.append(body).append('\n')
+                }
+                String methodComments = commentText(methodFlow.toString())
+                validateTeachingLineQuality("${name}:${requirements.taskName}", methodComments, requirements.minimumTeachingComments as int)
+                requireTeachingConcepts("${name}:${requirements.taskName}", methodComments, requirements.concepts as List<List<String>>)
+            }
+        }
+        Closure<Void> validateSourceText = { String name, String text ->
+            String comments = commentText(text)
+            String lowerComments = comments.toLowerCase(java.util.Locale.ROOT)
+            if (!comments.contains("J7M teaching:")) {
+                throw new GradleException("${name} lacks J7M teaching comments inside the developer-facing source flow")
+            }
+            ["todo", "tbd", "placeholder", "auto-generated", "generated comment"].each { String marker ->
+                if (lowerComments.contains(marker)) {
+                    throw new GradleException("${name} contains forbidden teaching-comment marker: ${marker}")
+                }
+            }
+            ["// creates object", "// calls method", "// demo step", "// increments counter"].each { String shallow ->
+                if (lowerComments.contains(shallow)) {
+                    throw new GradleException("${name} contains shallow restatement comment: ${shallow}")
+                }
+            }
+            ["enforces durable delivery automatically", "automatically enforces", "standalone security engine"].each { String overclaim ->
+                boolean safeSecurityPhrase = lowerComments.contains("without treating annotations as a standalone security engine")
+                        || lowerComments.contains("not a standalone security engine")
+                if (lowerComments.contains(overclaim) && !safeSecurityPhrase) {
+                    throw new GradleException("${name} contains teaching-comment overclaim: ${overclaim}")
+                }
+            }
+            ["generic exactly-once", "distributed acid", "certified compatibility", "certified adapter",
+             "full os sandbox guarantee", "full container runtime", "phase 7"].each { String forbidden ->
+                if (lowerComments.contains(forbidden) && !safeForbiddenContext(lowerComments)) {
+                    throw new GradleException("${name} contains forbidden positive teaching-comment claim: ${forbidden}")
+                }
+            }
+            if (lowerComments.contains("phase6-demo-secret-value")) {
+                throw new GradleException("${name} leaks a sentinel secret in teaching comments")
+            }
+            if (text.contains("@Sensitive") && !(lowerComments.contains("redact") || lowerComments.contains("redaction"))) {
+                throw new GradleException("${name} uses @Sensitive without a teaching comment about redaction")
+            }
+            if ((text.contains("@RequiresRole") || text.contains("@RequiresPermission"))
+                    && !(lowerComments.contains("authorization") || lowerComments.contains("denied"))) {
+                throw new GradleException("${name} uses security annotations without a teaching comment about authorization")
+            }
+            if ((text.contains("@Initialize") || text.contains("@Startup") || text.contains("@Drain") || text.contains("@Shutdown"))
+                    && !(lowerComments.contains("lifecycle") && lowerComments.contains("order"))) {
+                throw new GradleException("${name} uses lifecycle annotations without a teaching comment about lifecycle order")
+            }
+            if ((text.contains("@DurableQueueConsumer") || text.contains("@OutboxPublisher") || text.contains("@InboxHandler"))
+                    && !(lowerComments.contains("descriptor metadata") || lowerComments.contains("durablequeue") || lowerComments.contains("durable delivery"))) {
+                throw new GradleException("${name} uses queue annotations without a teaching comment about descriptor-only delivery boundaries")
+            }
+            if ((text.contains("@SagaDefinition") || text.contains("@SagaStep") || text.contains("@Compensation"))
+                    && !(lowerComments.contains("descriptor metadata") || lowerComments.contains("saga"))) {
+                throw new GradleException("${name} uses saga annotations without a teaching comment about saga descriptor boundaries")
+            }
+            if (text.contains("@IsolationProfile") && !(lowerComments.contains("container") || lowerComments.contains("os sandbox"))) {
+                throw new GradleException("${name} uses isolation annotations without a teaching comment about isolation limits")
+            }
+            if (name.endsWith("AnnotationModelDemo.java")) {
+                ["descriptor", "injection", "lifecycle", "redaction", "descriptor-only", "external services"].each { String term ->
+                    if (!lowerComments.contains(term)) {
+                        throw new GradleException("${name} AnnotationModelDemo comments missing concept: ${term}")
+                    }
+                }
+            }
+            validateDemoMethodRequirements(name, text)
+        }
+
+        validateDemoTaskInventory.call()
+
+        sourceFiles.each { File source ->
+            validateSourceText(source.path, source.getText("UTF-8"))
+        }
+
+        Closure<Void> expectFailure = { String name, String text ->
+            try {
+                validateSourceText(name, text)
+            } catch (GradleException expected) {
+                return
+            }
+            throw new GradleException("synthetic invalid source documentation passed validation: ${name}")
+        }
+        expectFailure("no-comments.java", "public final class Bad { public void run() { System.out.println(\"x\"); } }")
+        expectFailure("shallow.java", "public final class Bad { public void run() { // calls method\nx(); } }")
+        expectFailure("secure.java", "public final class Bad { @Sensitive public String run(String secret) { // J7M teaching: business code only.\nreturn secret; } }")
+        expectFailure("lifecycle.java", "public final class Bad { @Startup public void start() { // J7M teaching: starts component.\n} }")
+        expectFailure("descriptor-overclaim.java", "public final class Bad { @DurableQueueConsumer public void run() { // J7M teaching: this enforces durable delivery automatically.\n} }")
+        expectFailure("forbidden.java", "public final class Bad { public void run() { // J7M teaching: provides generic exactly-once distributed ACID certified compatibility.\n} }")
+        expectFailure("ConsensusSimulationDemo.java", "public final class ConsensusSimulationDemo {\n// J7M teaching: this demo block is self-contained so acceptance smoke runs do not require external services.\npublic static void main(String[] args) { electLeader(); submitCommand(); }\n}\n")
+        expectFailure("ConsensusSimulationDemo.java", "public final class ConsensusSimulationDemo {\n// J7M teaching: adversarial leader election stale leader majority safety invariant exactly-once acid\npublic static void main(String[] args) { electLeader(); submitCommand(); }\n}\n")
+        expectFailure("ConsensusSimulationDemo.java", "public final class ConsensusSimulationDemo {\npublic static void main(String[] args) {\n// J7M teaching: leader election is shown for the initial state so callers know which node accepts work.\n// J7M teaching: the majority side is used for progress after a partition so the demo remains deterministic.\n// J7M teaching: the report avoids generic exactly-once or ACID claims while printing safe status.\n}}\n")
+        expectFailure("CoordinationDemo.java", "public final class CoordinationDemo {\npublic static void main(String[] args) {\n// J7M teaching: membership liveness evidence is safe and local to the demo.\n// J7M teaching: a lease is acquired for leadership evidence.\n// J7M teaching: compare-and-set records guarded metadata without consensus.\n}}\n")
+        expectFailure("SagaDemo.java", "public final class SagaDemo {\npublic static void main(String[] args) {\n// J7M teaching: saga definition metadata sets the local workflow scope without ACID.\n// J7M teaching: ordered step execution is shown with a durable local service.\n// J7M teaching: compensation handles prior side effects without XA.\n// J7M teaching: timeout is driven by deterministic time.\n// J7M teaching: duplicate starts avoid generic exactly-once claims.\n// J7M teaching: status prints safe operational evidence.\n}}\n")
+        expectFailure("RepositoryReplicationDemo.java", "public final class RepositoryReplicationDemo {\npublic static void main(String[] args) {\n// J7M teaching: digest and exact bytes prove local artifact preservation without a cloud SDK.\n// J7M teaching: promotion and rollback gates are replicated as repository metadata.\n// J7M teaching: verification policy is kept with the artifact descriptor.\n// J7M teaching: status prints safe evidence for operators.\n}}\n")
+        expectFailure("IsolationDemo.java", "public final class IsolationDemo {\nprivate static void runParentDemo() {\n// J7M teaching: in-process policy checks are local and deterministic.\n// J7M teaching: filesystem and network policy decisions are explicit evidence.\n// J7M teaching: local process execution does not require a container runtime.\n}}\n")
+        expectFailure("DurableLogCrashRecoveryDemo.java", "public final class DurableLogCrashRecoveryDemo {\npublic static void main(String[] args) {\n// J7M teaching: stable records are written for the demo.\n// J7M teaching: output is printed as status.\n}}\n")
+        expectFailure("Phase1Demo.java", "public final class Phase1Demo {\n// J7M teaching: Phase1Demo covers many middleware concepts for developers.\npublic static void main(String[] args) { runTransport(\"grpc\"); }\nprivate static void runTransport(String transport) { export(); lookup(); }\nprivate static void runMulticastAndHp() { runMulticastDemo(true); }\nprivate static void runBootstrapFallback() { bootstrap(); }\nprivate static void runUdpMulticastOnly() { udp(); }\nprivate static void runMulticastDemo(boolean realUdp) { multicast(); }\nprivate static void runSecurityDemo() { secure(); }\nprivate static void runMtlsSecurityDemo() { mtls(); }\nprivate static void runWorkloadDemo() { workload(); }\nprivate static void runStreamingWorkloadDemo() { streaming(); }\nprivate static void runComplianceDemo() { compliance(); }\nprivate static void runApplicationDeploymentDemo() { deploy(); }\nprivate static void runModularApplicationDeploymentDemo() { deploy(); }\nprivate static void runApplicationUpgradeRollbackDemo() { upgrade(); }\nprivate static void runUpgradeStrategyDemo(String strategy) { upgrade(); }\nprivate static void runApplicationFailureDiagnosticsDemo() { diagnose(); }\nprivate static void runApplicationAdminStatusDemo() { status(); }\nprivate static void runHelloRemoteServiceExample() { hello(); }\nprivate static void runCallbacksAndEventsExample() { callbacks(); }\nprivate static void runCallbackExampleForTransport(String transport) { callback(); }\nprivate static void runSecureBankingWorkflowExample() { banking(); }\nprivate static void runHaHpClusterExample() { cluster(); }\nprivate static void runWorkloadProcessingExample() { processing(); }\nprivate static void runStreamingPipelineExample() { pipeline(); }\nprivate static void runRegulatedEnterpriseAppExample() { regulated(); }\n}\n")
+        expectFailure("Phase1Demo.java", "public final class Phase1Demo {\n// J7M teaching: dispatcher transport objectref callback failover multicast bootstrap udp deterministic fallback external network security context caller identity redaction insecure transport configuration guard leasing fencing scheduler exactly-once streaming fan-out scatter durable queue compliance evidence crypto posture tamper certification packaging verify activation lookup cleanup jpms modulelayer upgrade rollback unsupported strategy local diagnostics safe registry cleanup operator-facing upgrade history audit bundle unload authorization denied redacted ha/hp selection consensus workload checkpoint cancellation backpressure oversized sbom provenance signature.\npublic static void main(String[] args) { runTransport(\"grpc\"); }\nprivate static void runTransport(String transport) { export(); lookup(); }\nprivate static void runMulticastAndHp() { runMulticastDemo(true); }\nprivate static void runBootstrapFallback() { bootstrap(); }\nprivate static void runUdpMulticastOnly() { udp(); }\nprivate static void runMulticastDemo(boolean realUdp) { multicast(); }\nprivate static void runSecurityDemo() { secure(); }\nprivate static void runMtlsSecurityDemo() { mtls(); }\nprivate static void runWorkloadDemo() { workload(); }\nprivate static void runStreamingWorkloadDemo() { streaming(); }\nprivate static void runComplianceDemo() { compliance(); }\nprivate static void runApplicationDeploymentDemo() { deploy(); }\nprivate static void runModularApplicationDeploymentDemo() { deploy(); }\nprivate static void runApplicationUpgradeRollbackDemo() { upgrade(); }\nprivate static void runUpgradeStrategyDemo(String strategy) { upgrade(); }\nprivate static void runApplicationFailureDiagnosticsDemo() { diagnose(); }\nprivate static void runApplicationAdminStatusDemo() { status(); }\nprivate static void runHelloRemoteServiceExample() { hello(); }\nprivate static void runCallbacksAndEventsExample() { callbacks(); }\nprivate static void runCallbackExampleForTransport(String transport) { callback(); }\nprivate static void runSecureBankingWorkflowExample() { banking(); }\nprivate static void runHaHpClusterExample() { cluster(); }\nprivate static void runWorkloadProcessingExample() { processing(); }\nprivate static void runStreamingPipelineExample() { pipeline(); }\nprivate static void runRegulatedEnterpriseAppExample() { regulated(); }\n}\n")
+        expectFailure("Phase1Demo.java", "public final class Phase1Demo {\npublic static void main(String[] args) {\n// J7M teaching: run demo.\nrunTransport(\"grpc\");\n}\nprivate static void runTransport(String transport) { // J7M teaching: call method.\nlookup(); }\nprivate static void runMulticastAndHp() { // J7M teaching: demo step.\nrunMulticastDemo(true); }\nprivate static void runBootstrapFallback() { // J7M teaching: build object.\nbootstrap(); }\n}\n")
+        expectFailure("Phase1Demo.java", "public final class Phase1Demo {\npublic static void main(String[] args) {\n// J7M teaching: this block demonstrates the dispatcher path for developers.\n// J7M teaching: this block demonstrates the dispatcher path for developers.\nrunTransport(\"grpc\");\n}\nprivate static void runTransport(String transport) { // J7M teaching: transport ObjectRef callback failover evidence is reported.\nlookup(); }\nprivate static void runMulticastAndHp() { // J7M teaching: multicast discovery evidence is local.\nrunMulticastDemo(true); }\nprivate static void runBootstrapFallback() { // J7M teaching: bootstrap fallback is deterministic.\nbootstrap(); }\n}\n")
+        expectFailure("Phase1Demo.java", "public final class Phase1Demo {\npublic static void main(String[] args) {\n// J7M teaching: the demo provides generic exactly-once delivery for all transports.\nrunTransport(\"grpc\");\n}\nprivate static void runTransport(String transport) { // J7M teaching: transport ObjectRef callback failover evidence is reported.\nlookup(); }\nprivate static void runMulticastAndHp() { // J7M teaching: multicast discovery evidence is local.\nrunMulticastDemo(true); }\nprivate static void runBootstrapFallback() { // J7M teaching: bootstrap fallback is deterministic.\nbootstrap(); }\n}\n")
+        expectFailure("Phase1Demo.java", "public final class Phase1Demo {\npublic static void main(String[] args) {\n// J7M teaching: this demo proves distributed ACID behavior across arbitrary services.\nrunTransport(\"grpc\");\n}\nprivate static void runTransport(String transport) { // J7M teaching: transport ObjectRef callback failover evidence is reported.\nlookup(); }\nprivate static void runMulticastAndHp() { // J7M teaching: multicast discovery evidence is local.\nrunMulticastDemo(true); }\nprivate static void runBootstrapFallback() { // J7M teaching: bootstrap fallback is deterministic.\nbootstrap(); }\n}\n")
+        expectFailure("Phase1Demo.java", "public final class Phase1Demo {\npublic static void main(String[] args) {\n// J7M teaching: this demo certifies compatibility for every adapter.\nrunTransport(\"grpc\");\n}\nprivate static void runTransport(String transport) { // J7M teaching: transport ObjectRef callback failover evidence is reported.\nlookup(); }\nprivate static void runMulticastAndHp() { // J7M teaching: multicast discovery evidence is local.\nrunMulticastDemo(true); }\nprivate static void runBootstrapFallback() { // J7M teaching: bootstrap fallback is deterministic.\nbootstrap(); }\n}\n")
+        expectFailure("Phase1Demo.java", "public final class Phase1Demo {\npublic static void main(String[] args) {\n// J7M teaching: do not leak sentinel secret phase6-demo-secret-value in output.\nrunTransport(\"grpc\");\n}\nprivate static void runTransport(String transport) { // J7M teaching: transport ObjectRef callback failover evidence is reported.\nlookup(); }\nprivate static void runMulticastAndHp() { // J7M teaching: multicast discovery evidence is local.\nrunMulticastDemo(true); }\nprivate static void runBootstrapFallback() { // J7M teaching: bootstrap fallback is deterministic.\nbootstrap(); }\n}\n")
+        try {
+            validateDemoTaskInventoryRows(["runMissingDemo"] as Set<String>, demoTaskInventory)
+            throw new GradleException("synthetic demo task inventory omission passed validation")
+        } catch (GradleException expected) {
+            if (!expected.message.contains("missing run tasks")) {
+                throw expected
+            }
+        }
+        try {
+            validateDemoTaskInventoryRows(["runBrokenDemo"] as Set<String>, [[taskName: "runBrokenDemo", mainClass: "org.example.BrokenDemo",
+                    sourceFile: phase1Source, signatures: [], classification: "developer-visible demo"]])
+            throw new GradleException("synthetic demo task without method-flow coverage passed validation")
+        } catch (GradleException expected) {
+            if (!expected.message.contains("without method-flow signatures")) {
+                throw expected
+            }
+        }
+        try {
+            validateDemoTaskInventoryRows(["runDuplicateDemo"] as Set<String>, [
+                    [taskName: "runDuplicateDemo", mainClass: "org.j7m.middleware.demo.Phase1Demo", sourceFile: phase1Source,
+                     signatures: ["public static void main"], classification: "developer-visible demo", minimumTeachingComments: 1,
+                     concepts: [["dispatcher"]]],
+                    [taskName: "runDuplicateDemo", mainClass: "org.j7m.middleware.demo.Phase1Demo", sourceFile: phase1Source,
+                     signatures: ["public static void main"], classification: "developer-visible demo", minimumTeachingComments: 1,
+                     concepts: [["dispatcher"]]]
+            ])
+            throw new GradleException("synthetic duplicate demo inventory row passed validation")
+        } catch (GradleException expected) {
+            if (!expected.message.contains("duplicate task rows")) {
+                throw expected
+            }
+        }
+        try {
+            validateDemoTaskInventoryRows(["runStaleDemo"] as Set<String>, [[taskName: "runStaleDemo", mainClass: "org.example.StaleDemo",
+                    sourceFile: phase1Source, signatures: ["public static void main"], classification: "developer-visible demo",
+                    minimumTeachingComments: 1, concepts: [["dispatcher"]]]])
+            throw new GradleException("synthetic stale demo source passed validation")
+        } catch (GradleException expected) {
+            if (!expected.message.contains("stale source file")) {
+                throw expected
+            }
+        }
+        try {
+            validateDemoTaskInventoryRows(["runMissingConceptsDemo"] as Set<String>, [[taskName: "runMissingConceptsDemo",
+                    mainClass: "org.j7m.middleware.demo.Phase1Demo", sourceFile: phase1Source,
+                    signatures: ["public static void main"], classification: "developer-visible demo",
+                    minimumTeachingComments: 1, concepts: []]])
+            throw new GradleException("synthetic demo task without intended concepts passed validation")
+        } catch (GradleException expected) {
+            if (!expected.message.contains("without intended concepts")) {
+                throw expected
+            }
+        }
+    }
+}
+
+tasks.register("validateProfessionalJavadocs") {
+    group = "verification"
+    description = "Runs the stricter Phase 6.11 professional public API documentation audit."
+    dependsOn "validatePublicApiDocs"
+    dependsOn "validateExampleJavadocs"
+    dependsOn "validateExampleSourceDocumentation"
+    doLast {
+        List<String> shallowPatterns = [
+                "/** Gets ",
+                "/** Returns the value.",
+                "/** Creates object.",
+                "Tag-only"
+        ]
+        List<File> publicSources = fileTree("j7m-api/src/main/java").matching {
+            include "**/*.java"
+            exclude "**/internal/**"
+        }.files as List<File>
+        List<String> shallow = []
+        publicSources.each { File source ->
+            String text = source.getText("UTF-8")
+            shallowPatterns.each { String pattern ->
+                if (text.contains(pattern)) {
+                    shallow.add("${source}:${pattern}")
+                }
+            }
+        }
+        if (!shallow.isEmpty()) {
+            throw new GradleException("shallow public API Javadocs detected: ${shallow.take(20)}")
+        }
+    }
+}
+
+tasks.named("build") {
+    dependsOn "validatePublicApiDocs"
+    dependsOn "validateBuildConventions"
+    dependsOn "validateVersionCatalog"
+    dependsOn "validateModuleTopology"
+    dependsOn "validateInjectionModel"
+    dependsOn "validateAnnotationModel"
+    dependsOn "validateProfessionalJavadocs"
+    dependsOn "validateExampleJavadocs"
+    dependsOn "validateExampleSourceDocumentation"
+}

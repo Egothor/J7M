@@ -1,0 +1,40 @@
+{
+  "schemaVersion": "j7m.application/v1",
+  "application": {
+    "group": "org.j7m.examples",
+    "name": "ha-hp-cluster",
+    "version": "1.0.0",
+    "displayName": "HA HP Cluster",
+    "description": "Multiple-instance HA and HP selection example"
+  },
+  "runtime": {
+    "minJ7mVersion": "0.5.5",
+    "javaVersion": "25",
+    "moduleMode": "CLASSPATH",
+    "bootstrapClass": "org.j7m.examples.cluster.ClusteredGreetingServiceImpl"
+  },
+  "services": [
+    {
+      "serviceName": "//apps/example/cluster/GreetingService",
+      "interfaceName": "org.j7m.examples.cluster.ClusteredGreetingService",
+      "implementationClass": "org.j7m.examples.cluster.ClusteredGreetingServiceImpl",
+      "transport": "grpc",
+      "globallyExported": true,
+      "metadata": {
+        "domain": "example",
+        "classification": "internal",
+        "example": "ha-hp-cluster"
+      }
+    }
+  ],
+  "security": {
+    "trustDomain": "dev",
+    "confidential": false
+  },
+  "resources": {
+    "cpu": "1",
+    "memory": "256MiB",
+    "maxConcurrentInvocations": 32,
+    "maxInboundPayload": "4MiB"
+  }
+}
