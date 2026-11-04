@@ -121,7 +121,10 @@ class ManagedSagaProcessIT {
                     if(kind.equals(hold)) {applied.countDown();assertTrue(release.await(15,TimeUnit.SECONDS));}
                 }
                 var out=new DataOutputStream(accepted.getOutputStream());out.writeBoolean(result!=null);if(result!=null)out.writeUTF(result);out.flush();
-            } catch(IOException expectedKilledPeer) { /* The originating JVM is deliberately killed after its external effect. */ }
+            } catch(IOException expectedKilledPeer) {
+                // The originating JVM is deliberately killed after its external effect; stop serving that peer.
+                return;
+            }
             catch(InterruptedException interrupted) {Thread.currentThread().interrupt();}
         }
         public void close() throws Exception {closed=true;release.countDown();socket.close();acceptor.join(1000);workers.shutdownNow();assertTrue(workers.awaitTermination(3,TimeUnit.SECONDS));}

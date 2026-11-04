@@ -99,7 +99,10 @@ public final class DeduplicationFrontendProcess {
                         lifetime.markApplicationEntry(); return generated.adapter.invoke(generated.instance, generated.contract.method(), new Object[]{key, input});
                     }
                 }));
-            } catch (Exception failure) { /* The normalized logical result is authoritative, including failed finalization. */ }
+            } catch (Exception failure) {
+                // The normalized logical result is authoritative, including failed finalization.
+                return lifetime.logicalResult().toCompletableFuture().get(12, TimeUnit.SECONDS);
+            }
             return lifetime.logicalResult().toCompletableFuture().get(12, TimeUnit.SECONDS);
         } finally { lifetime.close(); lifetime.physicalCompletion().toCompletableFuture().get(12, TimeUnit.SECONDS); }
     }

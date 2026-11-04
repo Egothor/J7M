@@ -46,6 +46,7 @@ module org.j7m.transport.grpc {
     requires com.google.protobuf;
     requires io.grpc;
     requires io.grpc.stub;
+    requires io.grpc.netty.shaded;
     requires transitive org.j7m.api;
 
     exports org.j7m.middleware.transport.grpc;

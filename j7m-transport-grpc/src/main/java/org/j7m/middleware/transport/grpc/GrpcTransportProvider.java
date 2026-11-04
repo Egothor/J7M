@@ -46,6 +46,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
 import org.j7m.middleware.transport.api.AsyncMethodDescriptor;
+import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder;
 import io.grpc.CallOptions;
 import io.grpc.ChannelCredentials;
 import io.grpc.Context;
@@ -198,6 +199,7 @@ public final class GrpcTransportProvider implements StreamingTransportProvider {
                     .build();
 
     private final GrpcSecurityOptions securityOptions;
+    private final GrpcNetworkConfiguration networkConfiguration;
     private final ConcurrentMap<String, ExportDescriptor> exports;
     private final ConcurrentMap<String, ManagedChannel> channels;
     private final AtomicLong credentialRefreshCount;
@@ -225,7 +227,23 @@ public final class GrpcTransportProvider implements StreamingTransportProvider {
      * @param securityOptions security options
      */
     public GrpcTransportProvider(final GrpcSecurityOptions securityOptions) {
+        this(securityOptions, GrpcNetworkConfiguration.loopback());
+    }
+
+    /**
+     * Creates a provider with explicit TLS policy and listener/published destination.
+     *
+     * @param securityOptions security options; null retains development defaults
+     * @param networkConfiguration listener and advertised endpoint configuration
+     * @throws MiddlewareException with INVALID_ARGUMENT if networkConfiguration is null
+     */
+    public GrpcTransportProvider(final GrpcSecurityOptions securityOptions,
+            final GrpcNetworkConfiguration networkConfiguration) {
+        if (networkConfiguration == null) {
+            throw MiddlewareException.of(MiddlewareErrorCode.INVALID_ARGUMENT, "grpc networkConfiguration is required");
+        }
         this.securityOptions = securityOptions == null ? GrpcSecurityOptions.development() : securityOptions;
+        this.networkConfiguration = networkConfiguration;
         this.exports = new ConcurrentHashMap<>();
         this.channels = new ConcurrentHashMap<>();
         this.credentialRefreshCount = new AtomicLong();
@@ -249,14 +267,19 @@ public final class GrpcTransportProvider implements StreamingTransportProvider {
      * {@inheritDoc}
      */
     @Override
-    public TransportEndpoint start(final RuntimeTransportContext newContext) {
+    public synchronized TransportEndpoint start(final RuntimeTransportContext newContext) {
+        if (this.running || this.asyncWorkers.isShutdown()) {
+            throw MiddlewareException.of(MiddlewareErrorCode.TRANSPORT_ERROR, "grpc provider is already started or closed");
+        }
         if (newContext == null) {
             throw MiddlewareException.of(MiddlewareErrorCode.INVALID_ARGUMENT, "transport context is required");
         }
         if (this.securityOptions.productionMode() && !this.securityOptions.tlsEnabled() && !this.securityOptions.allowInsecureProductionTransport()) {
             throw MiddlewareException.of(MiddlewareErrorCode.TRANSPORT_ERROR, "insecure grpc transport is rejected in production mode");
         }
+        java.net.InetSocketAddress bindAddress = this.networkConfiguration.bindAddress();
         this.asyncWorkers.allowCoreThreadTimeOut(true);
+        Server candidateServer = null;
         try {
             io.grpc.ServerServiceDefinition service = io.grpc.ServerServiceDefinition.builder(SERVICE_NAME)
                             .addMethod(INVOKE_METHOD, unary(this::handleInvoke))
@@ -270,17 +293,21 @@ public final class GrpcTransportProvider implements StreamingTransportProvider {
             if (this.securityOptions.tlsEnabled()) {
                 service = ServerInterceptors.intercept(service, new PeerSecurityInterceptor(this.securityOptions.tlsConfiguration()));
             }
-            Server grpcServer = Grpc.newServerBuilderForPort(0, this.serverCredentials())
+            candidateServer = NettyServerBuilder.forAddress(bindAddress, this.serverCredentials())
                     .maxInboundMessageSize(MAX_GRPC_MESSAGE_BYTES)
                     .addService(service)
-                    .build()
-                    .start();
+                    .build();
+            candidateServer.start();
+            TransportEndpoint published = new TransportEndpoint(this.id(), this.networkConfiguration.endpoint(candidateServer.getPort()));
             this.context = newContext;
-            this.server = grpcServer;
+            this.server = candidateServer;
+            this.endpoint = published;
             this.running = true;
-            this.endpoint = new TransportEndpoint(this.id(), "grpc://127.0.0.1:" + grpcServer.getPort());
             return this.endpoint;
         } catch (Exception exception) {
+            if (candidateServer != null) {
+                candidateServer.shutdownNow();
+            }
             throw new MiddlewareException(new RemoteError(MiddlewareErrorCode.TRANSPORT_ERROR, "failed to start grpc transport",
                     Map.of(), null, null, true, true), exception);
         }
@@ -644,7 +671,7 @@ public final class GrpcTransportProvider implements StreamingTransportProvider {
      * {@inheritDoc}
      */
     @Override
-    public void close() {
+    public synchronized void close() {
         this.running = false;
         this.exports.clear();
         this.asyncWorkers.shutdown();

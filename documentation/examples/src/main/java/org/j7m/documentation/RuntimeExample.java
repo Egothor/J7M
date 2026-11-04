@@ -51,6 +51,8 @@ import org.j7m.middleware.registry.embedded.EmbeddedRegistryClient;
 import org.j7m.middleware.registry.embedded.EmbeddedRegistryStore;
 import org.j7m.middleware.runtime.MiddlewareRuntimeBuilder;
 import org.j7m.middleware.transport.grpc.GrpcTransportProvider;
+import org.j7m.middleware.transport.grpc.GrpcNetworkConfiguration;
+import org.j7m.middleware.transport.grpc.GrpcSecurityOptions;
 
 /**
  * Runs real gRPC invocation and callback traffic between two runtimes in one JVM.
@@ -107,7 +109,9 @@ public final class RuntimeExample {
         var store = new EmbeddedRegistryStore();
         try (var server = new MiddlewareRuntimeBuilder().runtimeId("docs-server")
                     .registry(new EmbeddedRegistryClient(store, Clock.systemUTC()))
-                    .addTransport(new GrpcTransportProvider()).disableNuggetAdmin().build();
+                    .addTransport(new GrpcTransportProvider(GrpcSecurityOptions.development(),
+                            new GrpcNetworkConfiguration("127.0.0.2", 0, "127.0.0.2", 0)))
+                    .disableNuggetAdmin().build();
                 var client = new MiddlewareRuntimeBuilder().runtimeId("docs-client")
                     .registry(new EmbeddedRegistryClient(store, Clock.systemUTC()))
                     .addTransport(new GrpcTransportProvider()).disableNuggetAdmin().build()) {

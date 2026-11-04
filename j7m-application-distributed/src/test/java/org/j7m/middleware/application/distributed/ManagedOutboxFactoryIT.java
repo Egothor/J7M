@@ -107,8 +107,10 @@ class ManagedOutboxFactoryIT {
     @AfterEach void close() { if (server != null) server.stop(); }
     Connection raw() throws SQLException { return DriverManager.getConnection(url, "sa", ""); }
     int count(String sql) throws SQLException {
-        if (sql.contains("FROM j7m_outbox")) sql += (sql.contains("WHERE") ? " AND" : " WHERE") + " scope='" + relay.publication().scope() + "'";
-        try (var c = raw(); var s = c.createStatement(); var r = s.executeQuery(sql)) { assertTrue(r.next()); return r.getInt(1); } }
+        String scopedSql = sql.contains("FROM j7m_outbox")
+                ? sql + (sql.contains("WHERE") ? " AND" : " WHERE") + " scope='" + relay.publication().scope() + "'"
+                : sql;
+        try (var c = raw(); var s = c.createStatement(); var r = s.executeQuery(scopedSql)) { assertTrue(r.next()); return r.getInt(1); } }
     static ManagedDependency edge(String name, Class<?> type) { return new ManagedDependency(type, name, List.of(), true, Map.of("resource.name", name, "binding.refresh", "NEVER", "binding.policy", "default")); }
     static ManagedComponentDefinition<?> owner(Class<?> type, ManagedDependency dependency) {
         return new ManagedComponentDefinition<Object>() {

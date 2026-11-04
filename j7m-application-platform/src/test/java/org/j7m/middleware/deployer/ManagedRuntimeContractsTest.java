@@ -55,12 +55,17 @@ class ManagedRuntimeContractsTest {
     @org.j7m.middleware.annotations.PartitionHandler(resource = "counter")
     static class ClaimedPartition { }
     static class ClaimedCallback {
+        private String hiddenData;
         @org.j7m.middleware.annotations.EventSubscription("events") public void receive(String data) { }
-        @org.j7m.middleware.annotations.EventSubscription("hidden") private void hidden(String data) { }
+        @org.j7m.middleware.annotations.EventSubscription("hidden") private void hidden(String data) { hiddenData = data; }
     }
 
     @Test
     void installedCapabilitiesCannotHideMissingOrWrongFiniteHostedDescriptors() throws Exception {
+        var callback = new ClaimedCallback();
+        callback.hidden("local helper");
+        assertEquals("local helper", callback.hiddenData);
+        assertTrue(java.lang.reflect.Modifier.isPrivate(ClaimedCallback.class.getDeclaredMethod("hidden", String.class).getModifiers()));
         var subscription = org.j7m.middleware.annotations.EventSubscription.class;
         var partition = org.j7m.middleware.annotations.PartitionHandler.class;
         assertThrows(IllegalArgumentException.class, () -> ManagedRuntimeContracts.validateHostedCoverage(ClaimedPartition.class,

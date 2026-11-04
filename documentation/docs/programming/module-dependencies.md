@@ -49,9 +49,16 @@ flowchart BT
 
 This diagram is a simplified reading guide; the table is the complete direct J7M descriptor map. Dependencies do not automatically start listeners, create durable resources or activate distributed services.
 
+The modular application examples use their own JPMS namespace:
+
+| Gradle project | JPMS name | Direct requirements |
+| --- | --- | --- |
+| `examples:modular-hello-api` | `com.example.j7m.modular.hello.api` | None |
+| `examples:modular-hello-impl` | `com.example.j7m.modular.hello.impl` | `com.example.j7m.modular.hello.api`, `org.j7m.api` |
+
 ## Service loading and generated metadata
 
-The runtime uses `TransportProvider`; gRPC and RMI modules provide implementations. The kernel provides `ValueCodec`. The public API and application host use `SchemaIndex`; the application platform also uses `ManagedComponentIndex`. The annotation processor provides `javax.annotation.processing.Processor` and generates application metadata at compilation. The CLI uses its `NuggetCliClientProvider` extension point.
+Runtime provider discovery uses `java.util.ServiceLoader`: `MiddlewareRuntimeBuilder` calls `ServiceLoader.load(TransportProvider.class)` to find implementations supplied by the gRPC and RMI modules. JPMS `uses` directives declare service consumption, and `provides` directives register implementations. Discovering a provider does not itself start its listener; runtime startup handles that lifecycle. The kernel provides `ValueCodec`. The public API and application host use `SchemaIndex`; the application platform also uses `ManagedComponentIndex`. The annotation processor provides `javax.annotation.processing.Processor` and generates application metadata at compilation. The CLI uses its `NuggetCliClientProvider` extension point.
 
 An application module typically starts with:
 
