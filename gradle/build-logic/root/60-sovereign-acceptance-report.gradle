@@ -1256,7 +1256,7 @@ tasks.register("generateWave5Phase6Evidence") {
     rootProject.ext.wave5Phase6RequiredTaskPaths.each { String taskPath -> dependsOn taskPath }
     outputs.upToDateWhen { false }
     doLast {
-        File reportDirectory = file("${buildDir}/reports/j7m")
+        File reportDirectory = file("${layout.buildDirectory.get().asFile}/reports/j7m")
         reportDirectory.mkdirs()
         Map<String, Object> evidence = rootProject.ext.wave5Phase6BuildEvidence()
         String json = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(evidence)) + System.lineSeparator()
@@ -1335,7 +1335,7 @@ tasks.register("generatePhase6AcceptanceReport") {
     description = "Generates final Phase 6 sovereign reliability acceptance evidence."
     dependsOn "validateWave5Phase6Evidence"
 	    doLast {
-	        File reportDirectory = file("${buildDir}/reports/j7m")
+	        File reportDirectory = file("${layout.buildDirectory.get().asFile}/reports/j7m")
 	        reportDirectory.mkdirs()
 	        String stableMarkdown = rootProject.ext.phase6StableMarkdownReport()
 	        boolean stableChanged = rootProject.ext.phase6WriteIfChanged(file("build/reports/j7m/phase-6-acceptance-contract.md"), stableMarkdown)
@@ -1365,8 +1365,8 @@ tasks.register("validateSovereignReliability") {
     dependsOn "validateExampleSourceDocumentation"
     doLast {
         File markdownReport = file("build/reports/j7m/phase-6-acceptance-contract.md")
-        File buildMarkdownReport = file("${buildDir}/reports/j7m/phase-6-acceptance-report.md")
-        File jsonReport = file("${buildDir}/reports/j7m/phase-6-acceptance-report.json")
+        File buildMarkdownReport = file("${layout.buildDirectory.get().asFile}/reports/j7m/phase-6-acceptance-report.md")
+        File jsonReport = file("${layout.buildDirectory.get().asFile}/reports/j7m/phase-6-acceptance-report.json")
 	        [markdownReport, buildMarkdownReport, jsonReport].each { File required ->
 	            if (!required.isFile() || required.length() == 0L) {
 	                throw new GradleException("missing generated Phase 6 acceptance report: ${required}")

@@ -681,16 +681,16 @@ static List<String> checkpoint4EvidenceMarkdownLines(final Map<String, Object> e
 
 static List<File> phase7ResultDirectories(final Project project, final Project rootProject) {
     return [
-            new File(project.buildDir, "test-results/validateNuggetAdmin"),
-            new File(project.buildDir, "test-results/validateNuggetSecurity"),
-            new File(project.buildDir, "test-results/validateNuggetDiscovery"),
-            new File(project.buildDir, "test-results/validateNuggetIntrospectionRedaction"),
-            new File(project.buildDir, "test-results/validateNuggetInspection"),
-            new File(project.buildDir, "test-results/validateNuggetApplicationLifecycle"),
-            new File(project.buildDir, "test-results/validateNuggetShutdownControls"),
-            new File(project.buildDir, "test-results/validateNuggetAdminApiContract"),
-            new File(project.buildDir, "test-results/validateNuggetPublicApiBoundary"),
-            new File(rootProject.project(":j7m-deployer-cli").buildDir, "test-results/validateJ7mCliConsole")
+            new File(project.layout.buildDirectory.get().asFile, "test-results/validateNuggetAdmin"),
+            new File(project.layout.buildDirectory.get().asFile, "test-results/validateNuggetSecurity"),
+            new File(project.layout.buildDirectory.get().asFile, "test-results/validateNuggetDiscovery"),
+            new File(project.layout.buildDirectory.get().asFile, "test-results/validateNuggetIntrospectionRedaction"),
+            new File(project.layout.buildDirectory.get().asFile, "test-results/validateNuggetInspection"),
+            new File(project.layout.buildDirectory.get().asFile, "test-results/validateNuggetApplicationLifecycle"),
+            new File(project.layout.buildDirectory.get().asFile, "test-results/validateNuggetShutdownControls"),
+            new File(project.layout.buildDirectory.get().asFile, "test-results/validateNuggetAdminApiContract"),
+            new File(project.layout.buildDirectory.get().asFile, "test-results/validateNuggetPublicApiBoundary"),
+            new File(rootProject.project(":j7m-deployer-cli").layout.buildDirectory.get().asFile, "test-results/validateJ7mCliConsole")
     ]
 }
 

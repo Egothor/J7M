@@ -125,7 +125,7 @@ tasks.register("generateApplicationPlatformAcceptanceReport") {
     dependsOn "validateJ7mArchitecture"
     dependsOn "validateApplicationPlatformDocs"
     doLast {
-        File reportDirectory = file("${buildDir}/reports/j7m")
+        File reportDirectory = file("${layout.buildDirectory.get().asFile}/reports/j7m")
         reportDirectory.mkdirs()
         Map<String, Integer> testCounts = [tests: 0, failures: 0, errors: 0, skipped: 0, passed: 0]
         List<Map<String, Object>> skippedTests = []
@@ -571,11 +571,11 @@ tasks.register("generateApplicationPlatformAcceptanceReport") {
                     guidanceOnly: true
             ])
         }
-        File jpmsReportFile = file("${buildDir}/reports/j7m/jpms-boundaries.json")
+        File jpmsReportFile = file("${layout.buildDirectory.get().asFile}/reports/j7m/jpms-boundaries.json")
         Object jpmsReport = jpmsReportFile.isFile() ? new groovy.json.JsonSlurper().parse(jpmsReportFile) : [:]
         String jpmsEvidenceStatus = requiredEvidenceStatus([
                 taskEvidenceStatus(":validateJ7mArchitecture"),
-                jsonArtifactEvidenceStatus("${buildDir}/reports/j7m/jpms-boundaries.json")
+                jsonArtifactEvidenceStatus("${layout.buildDirectory.get().asFile}/reports/j7m/jpms-boundaries.json")
         ])
         Map<String, String> requiredFieldEvidence = [
                 dependencyBoundaries: requiredEvidenceStatus([
@@ -967,7 +967,7 @@ tasks.register("generateApplicationPlatformLimitationBurndownReport") {
     description = "Generates a Phase 5.6 limitation burn-down report from the acceptance matrix."
     dependsOn "generateApplicationPlatformAcceptanceReport"
     doLast {
-        File reportDirectory = file("${buildDir}/reports/j7m")
+        File reportDirectory = file("${layout.buildDirectory.get().asFile}/reports/j7m")
         reportDirectory.mkdirs()
         Object evidence = new groovy.json.JsonSlurper().parse(new File(reportDirectory, "application-platform-acceptance.json"))
         Map<String, Integer> previousCounts = [

@@ -54,6 +54,7 @@ import org.gradle.api.GradleException;
 import org.gradle.api.Project;
 import org.gradle.api.Task;
 import org.gradle.testfixtures.ProjectBuilder;
+import org.gradle.testkit.runner.GradleRunner;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.j7m.middleware.api.LookupOptions;
@@ -271,6 +272,91 @@ final class J7mApplicationPluginTest {
                 projectDirectory.resolve("META-INF/j7m-application.json"), StandardCopyOption.REPLACE_EXISTING);
 
         assertThrows(GradleException.class, () -> this.execute(project, "j7mPackage"));
+    }
+
+    @Test
+    void lifecycleStoresAndReusesConfigurationCache() throws Exception {
+        Path directory = this.temporaryDirectory.resolve("cache-workflow");
+        Files.createDirectories(directory.resolve("META-INF"));
+        Files.writeString(directory.resolve("settings.gradle"), "rootProject.name = 'cache-workflow'\n");
+        Files.writeString(directory.resolve("build.gradle"), """
+                plugins {
+                    id 'java'
+                    id 'org.j7m.application'
+                }
+                def auxiliaryFile = layout.buildDirectory.file('auxiliary.txt').get().asFile
+                tasks.register('extraJar', Jar) {
+                    archiveFileName = 'extra.jar'
+                    from('README.md')
+                    outputs.file(auxiliaryFile)
+                    doLast { auxiliaryFile.text = 'auxiliary metadata' }
+                }
+                """);
+        Files.writeString(directory.resolve("README.md"), "Cache workflow documentation");
+        Files.writeString(directory.resolve("META-INF/j7m-application.json"), manifest("cache-workflow"));
+        GradleRunner runner = GradleRunner.create()
+                .withProjectDir(directory.toFile())
+                .withPluginClasspath()
+                .withArguments("j7mUnloadLocal", "--configuration-cache", "--warning-mode=fail", "--stacktrace");
+        String first = runner.build().getOutput();
+        assertTrue(first.contains("Configuration cache entry stored"), first);
+        assertTrue(first.contains("j7mVerify accepted profile=development"), first);
+        // Publishing is immutable: simulate a fresh local repository without changing cached configuration.
+        this.removeFixtureRepository(directory);
+        String second = runner.build().getOutput();
+        assertTrue(second.contains("Reusing configuration cache"), second);
+        assertTrue(second.contains("j7mUnloadLocal unavailable"), second);
+        Path bundle = directory.resolve("build/libs/cache-workflow.j7m");
+        try (ZipFile zip = new ZipFile(bundle.toFile(), StandardCharsets.UTF_8)) {
+            assertNotNull(zip.getEntry("lib/cache-workflow.jar"));
+            assertNotNull(zip.getEntry("docs/README.md"));
+            assertNotNull(zip.getEntry("lib/extra.jar"));
+            assertFalse(zip.stream().anyMatch(entry -> entry.getName().endsWith("auxiliary.txt")));
+        }
+        assertTrue(Files.readString(directory.resolve("build/j7m-repository/.local-runtime-state.json"))
+                .contains("UNAVAILABLE"));
+    }
+
+    @Test
+    void jpmsLifecycleStoresAndReusesConfigurationCache() throws Exception {
+        Path directory = this.temporaryDirectory.resolve("cache-jpms");
+        Files.createDirectories(directory.resolve("META-INF"));
+        Files.createDirectories(directory.resolve("modules"));
+        copyModularFixtureJar(modularHelloApiJar(), directory.resolve("modules/com.example.j7m.modular.hello.api.jar"));
+        copyModularFixtureJar(modularHelloImplJar(), directory.resolve("modules/com.example.j7m.modular.hello.impl.jar"));
+        Files.copy(projectPath("examples/modular-deployable-application/META-INF/j7m-application.json"),
+                directory.resolve("META-INF/j7m-application.json"));
+        Files.writeString(directory.resolve("settings.gradle"), "rootProject.name = 'cache-jpms'\n");
+        Files.writeString(directory.resolve("build.gradle"), """
+                plugins {
+                    id 'java'
+                    id 'org.j7m.application'
+                }
+                """);
+        GradleRunner runner = GradleRunner.create().withProjectDir(directory.toFile()).withPluginClasspath()
+                .withArguments("j7mUnloadLocal", "--configuration-cache", "--warning-mode=fail", "--stacktrace");
+        String first = runner.build().getOutput();
+        assertTrue(first.contains("Configuration cache entry stored"), first);
+        this.removeFixtureRepository(directory);
+        String second = runner.build().getOutput();
+        assertTrue(second.contains("Reusing configuration cache"), second);
+        assertTrue(second.contains("j7mUnloadLocal unavailable"), second);
+        try (ZipFile zip = new ZipFile(directory.resolve("build/libs/cache-jpms.j7m").toFile(), StandardCharsets.UTF_8)) {
+            assertNotNull(zip.getEntry("modules/com.example.j7m.modular.hello.api.jar"));
+            assertNotNull(zip.getEntry("modules/com.example.j7m.modular.hello.impl.jar"));
+            assertFalse(zip.stream().anyMatch(entry -> entry.getName().startsWith("lib/")));
+        }
+        String rejected = runner.buildAndFail().getOutput();
+        assertTrue(rejected.contains("Reusing configuration cache"), rejected);
+        assertTrue(rejected.contains("application artifact is immutable and already exists"), rejected);
+    }
+
+    private void removeFixtureRepository(final Path directory) throws Exception {
+        try (var paths = Files.walk(directory.resolve("build/j7m-repository"))) {
+            for (Path path : paths.sorted(java.util.Comparator.reverseOrder()).toList()) {
+                Files.delete(path);
+            }
+        }
     }
 
     private Project project(final String name) throws Exception {

@@ -423,7 +423,7 @@ tasks.register("validateJ7mArchitecture") {
                 }
             }
         }
-        File reportDirectory = file("${buildDir}/reports/j7m")
+        File reportDirectory = file("${layout.buildDirectory.get().asFile}/reports/j7m")
         reportDirectory.mkdirs()
         Map<String, Object> report = [
                 jpmsDescriptorCoverage: "PASS",

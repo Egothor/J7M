@@ -2,6 +2,21 @@
 
 The `org.j7m.application` Gradle plugin packages, signs, verifies and publishes J7M bundles to a local application repository. Its runtime lifecycle tasks currently report unavailable state; use a live host's application manager or Nugget administration for real activation and shutdown.
 
+## Build version and configuration cache
+
+The repository wrapper pins Gradle 9.8.2 and verifies the distribution's SHA-256 checksum. Use `./gradlew` with Java 25 for repository builds.
+
+The application plugin supports Gradle's configuration cache for classpath and JPMS packaging, including the local lifecycle chain. To store and then reuse a packaging configuration:
+
+```bash
+./gradlew j7mVerify --configuration-cache --warning-mode fail
+./gradlew j7mVerify --configuration-cache --warning-mode fail
+```
+
+Publishing remains immutable: rerunning `j7mDeployLocal` or a task that depends on it against an already published coordinate is rejected, even when the configuration cache is reused. Choose a new application version for a new publication.
+
+The plugin workflows above are tested on Gradle 9.8.2 with configuration cache and deprecation warnings treated as failures. This does not certify Gradle 10 compatibility or configuration-cache support for every repository reporting and validation task. Keep `--warning-mode fail` in migration checks and test additional task paths with `--configuration-cache` before enabling it repository-wide.
+
 ## Configure packaging
 
 This Groovy build fragment assumes the J7M plugin is available to the build through the project's configured plugin resolution:

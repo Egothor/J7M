@@ -51,6 +51,9 @@ import org.gradle.api.GradleException;
 import org.gradle.api.Plugin;
 import org.gradle.api.Project;
 import org.gradle.api.Task;
+import org.gradle.api.file.ConfigurableFileCollection;
+import org.gradle.api.file.FileCollection;
+import org.gradle.api.logging.Logger;
 import org.gradle.jvm.tasks.Jar;
 import org.j7m.middleware.application.api.ApplicationBundle;
 import org.j7m.middleware.application.api.ApplicationCoordinate;
@@ -102,8 +105,12 @@ public final class J7mApplicationPlugin implements Plugin<Project> {
                 .getBuildDirectory()
                 .file("libs/" + project.getName() + ".j7m"));
 
+        // Execution must retain file values rather than Project so the task graph can be cached.
+        File projectDirectory = project.getLayout().getProjectDirectory().getAsFile();
+        ConfigurableFileCollection projectJars = project.files();
+        project.getTasks().withType(Jar.class).configureEach(jar -> projectJars.from(jar.getArchiveFile()));
         this.register(project, "j7mPackage", "Packages a J7M application bundle.",
-                task -> this.packageBundle(project, extension));
+                task -> this.packageBundle(projectDirectory, projectJars, extension, task.getLogger()));
         this.register(project, "j7mSign", "Signs a J7M application bundle.",
                 task -> this.signBundle(extension));
         this.register(project, "j7mVerify", "Verifies a J7M application bundle.",
@@ -147,7 +154,11 @@ public final class J7mApplicationPlugin implements Plugin<Project> {
         });
     }
 
-    private void packageBundle(final Project project, final J7mApplicationExtension extension) {
+    private void packageBundle(
+            final File projectDirectory,
+            final FileCollection projectJars,
+            final J7mApplicationExtension extension,
+            final Logger logger) {
         Path manifest = extension.getManifest().get().getAsFile().toPath();
         Path bundle = extension.getBundleFile().get().getAsFile().toPath();
         try {
@@ -158,12 +169,12 @@ public final class J7mApplicationPlugin implements Plugin<Project> {
             if (!result.accepted()) {
                 throw new GradleException("J7M manifest rejected");
             }
-            List<Path> libraries = this.libraryPaths(project, extension, parsed);
-            List<Path> modules = this.modulePaths(project, extension, parsed);
-            List<Path> docs = this.documentationPaths(project, extension);
+            List<Path> libraries = this.libraryPaths(projectJars, extension, parsed);
+            List<Path> modules = this.modulePaths(projectDirectory, extension, parsed);
+            List<Path> docs = this.documentationPaths(projectDirectory, extension);
             List<Path> configurationFiles = this.fileCollectionPaths(extension.getConfigurationFiles());
             new J7mBundleWriter().write(manifest, bundle, libraries, modules, docs, configurationFiles);
-            project.getLogger().lifecycle("j7mPackage wrote {}", bundle.getFileName());
+            logger.lifecycle("j7mPackage wrote {}", bundle.getFileName());
         } catch (Exception exception) {
             throw new GradleException("j7mPackage failed: " + safe(exception), exception);
         }
@@ -254,13 +265,13 @@ public final class J7mApplicationPlugin implements Plugin<Project> {
     }
 
     private List<Path> libraryPaths(
-            final Project project,
+            final FileCollection projectJars,
             final J7mApplicationExtension extension,
             final ApplicationManifest manifest) {
         List<Path> libraries = new ArrayList<>(this.fileCollectionPaths(extension.getLibraries()));
         if (!"JPMS".equals(manifest.moduleMode())) {
-            project.getTasks().withType(Jar.class).forEach(task -> {
-                Path path = task.getArchiveFile().get().getAsFile().toPath();
+            projectJars.forEach(file -> {
+                Path path = file.toPath();
                 if (Files.isRegularFile(path) && !libraries.contains(path)) {
                     libraries.add(path);
                 }
@@ -270,12 +281,12 @@ public final class J7mApplicationPlugin implements Plugin<Project> {
     }
 
     private List<Path> modulePaths(
-            final Project project,
+            final File projectDirectory,
             final J7mApplicationExtension extension,
             final ApplicationManifest manifest) {
         List<Path> modules = new ArrayList<>(this.fileCollectionPaths(extension.getModules()));
-        Path projectDirectory = project.getLayout().getProjectDirectory().getAsFile().toPath();
-        List<Path> declared = new JpmsPackagingValidator().validateDeclaredModules(projectDirectory, manifest, modules);
+        List<Path> declared = new JpmsPackagingValidator()
+                .validateDeclaredModules(projectDirectory.toPath(), manifest, modules);
         for (Path modulePath : declared) {
             if (!modules.contains(modulePath)) {
                 modules.add(modulePath);
@@ -284,9 +295,9 @@ public final class J7mApplicationPlugin implements Plugin<Project> {
         return List.copyOf(modules);
     }
 
-    private List<Path> documentationPaths(final Project project, final J7mApplicationExtension extension) {
+    private List<Path> documentationPaths(final File projectDirectory, final J7mApplicationExtension extension) {
         List<Path> docs = new ArrayList<>(this.fileCollectionPaths(extension.getDocumentation()));
-        Path readme = project.getLayout().getProjectDirectory().file("README.md").getAsFile().toPath();
+        Path readme = projectDirectory.toPath().resolve("README.md");
         if (Files.isRegularFile(readme) && !docs.contains(readme)) {
             docs.add(readme);
         }
