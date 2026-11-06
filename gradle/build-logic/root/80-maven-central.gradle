@@ -1,0 +1,83 @@
+// Copyright (c) 2026, Leo Galambos and the Egothor team
+// SPDX-License-Identifier: BSD-4-Clause
+// Licensed under the BSD 4-Clause License; see LICENSE for the full terms.
+
+import org.gradle.api.publish.maven.tasks.PublishToMavenRepository
+
+/*
+ * Purpose: stages signed Maven Central publications with complete POM metadata.
+ * Owns: publication inventory, signing, Maven POMs and the local staging repository.
+ * Must not own: module dependencies, compilation conventions or network uploads.
+ * Root rationale: all publications share identity and one Central bundle repository.
+ * Related validation tasks: publishMavenJavaPublicationToCentralBundleRepository;
+ * tools/test_prepare_central_bundle.py validates complete bundle contents.
+ * Runtime-only scope is shared with the bundle validator through the manifest.
+ */
+def releaseVersion = providers.gradleProperty("releaseVersion")
+if (releaseVersion.isPresent() && (!(releaseVersion.get() ==~ /[0-9]+\.[0-9]+\.[0-9]+(?:-[A-Za-z0-9]+(?:[.-][A-Za-z0-9]+)*)?/) ||
+        releaseVersion.get().toUpperCase(Locale.ROOT).contains("SNAPSHOT"))) {
+    throw new GradleException("releaseVersion must be a non-SNAPSHOT release version such as 1.2.3 or 1.2.3-rc.1")
+}
+
+// The allowlist prevents new build/test/tool modules becoming public by default.
+def centralModules = file("gradle/central-publications.txt").readLines("UTF-8")
+        .collect { it.trim() }.findAll { !it.isEmpty() && !it.startsWith("#") }
+configure(centralModules.collect { project(":${it}") }) { module ->
+    apply plugin: "maven-publish"
+    apply plugin: "signing"
+
+    publishing {
+        publications {
+            mavenJava(MavenPublication) {
+                from components.java
+                pom {
+                    name = module.name
+                    description = "J7M Java middleware: ${module.name}"
+                    url = "https://github.com/Egothor/J7M"
+                    licenses {
+                        license {
+                            name = "BSD 4-Clause License"
+                            url = "https://github.com/Egothor/J7M/blob/main/LICENSE"
+                            distribution = "repo"
+                        }
+                    }
+                    developers {
+                        developer {
+                            id = "leo-galambos"
+                            name = "Leo Galambos"
+                            organization = "Egothor"
+                            organizationUrl = "https://www.egothor.org"
+                        }
+                    }
+                    scm {
+                        connection = "scm:git:https://github.com/Egothor/J7M.git"
+                        developerConnection = "scm:git:ssh://git@github.com/Egothor/J7M.git"
+                        url = "https://github.com/Egothor/J7M"
+                        tag = releaseVersion.map { "release@${it}" }.getOrElse("HEAD")
+                    }
+                }
+            }
+        }
+        repositories {
+            maven {
+                name = "centralBundle"
+                url = rootProject.layout.buildDirectory.dir("central-repository")
+            }
+        }
+    }
+    signing {
+        def signingKey = providers.environmentVariable("MAVEN_SIGNING_KEY")
+        if (signingKey.isPresent()) {
+            useInMemoryPgpKeys(signingKey.get(), providers.environmentVariable("MAVEN_SIGNING_PASSWORD").orNull)
+        }
+        required = true
+        sign publishing.publications.mavenJava
+    }
+    tasks.withType(PublishToMavenRepository).configureEach {
+        doFirst {
+            if (repository.name == "centralBundle" && !releaseVersion.isPresent()) {
+                throw new GradleException("Central staging requires -PreleaseVersion=<release version>")
+            }
+        }
+    }
+}

@@ -130,6 +130,7 @@ nav:
   - Lifecycle: deployment/lifecycle.md
   - Verification: deployment/verification.md
   - Gradle Workflow: deployment/gradle-workflow.md
+  - Maven Central Releases: deployment/releases.md
   - Application Repositories: deployment/repositories.md
   - Repository Replication: deployment/repository-replication.md
   - Upgrade and Rollback: deployment/upgrade-rollback.md

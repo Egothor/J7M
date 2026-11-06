@@ -1,0 +1,20 @@
+# Copyright (c) 2026, Leo Galambos and the Egothor team
+# SPDX-License-Identifier: BSD-4-Clause
+# Runtime middleware modules published to Maven Central. Build/test tools stay local.
+j7m-api
+j7m-kernel
+j7m-runtime
+j7m-durable-log
+j7m-messaging
+j7m-coordination
+j7m-consensus
+j7m-distributed-core
+j7m-saga
+j7m-isolation
+j7m-adapter-spi
+j7m-transport-grpc
+j7m-transport-rmi
+j7m-application-platform
+j7m-integrations
+j7m-cluster-management
+j7m-application-distributed

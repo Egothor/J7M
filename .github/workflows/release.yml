@@ -1,0 +1,85 @@
+# Copyright (c) 2026, Leo Galambos and the Egothor team
+# SPDX-License-Identifier: BSD-4-Clause
+# Licensed under the BSD 4-Clause License; see LICENSE for the full terms.
+name: Release
+
+on:
+  push:
+    tags: ['release@*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Validate release tag
+        id: version
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          version=$(python3 tools/prepare_central_bundle.py --tag "$RELEASE_TAG")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Validate release configuration
+        env:
+          CENTRAL_BEARER_TOKEN: ${{ secrets.CENTRAL_BEARER_TOKEN }}
+          MAVEN_SIGNING_KEY: ${{ secrets.MAVEN_SIGNING_KEY }}
+          MAVEN_SIGNING_PASSWORD: ${{ secrets.MAVEN_SIGNING_PASSWORD }}
+        run: |
+          test -n "$CENTRAL_BEARER_TOKEN"
+          test -n "$MAVEN_SIGNING_KEY"
+          test -n "$MAVEN_SIGNING_PASSWORD"
+      - name: Test release tooling
+        run: python3 -m unittest discover -s tools -p 'test_*.py'
+      - name: Build, test and validate Javadoc
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: ./gradlew clean check javadoc :j7m-deployer-cli:distTar :j7m-deployer-cli:distZip --no-daemon -PreleaseVersion="$RELEASE_VERSION"
+      - name: Stage signed Maven publications
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+          MAVEN_SIGNING_KEY: ${{ secrets.MAVEN_SIGNING_KEY }}
+          MAVEN_SIGNING_PASSWORD: ${{ secrets.MAVEN_SIGNING_PASSWORD }}
+        run: |
+          ./gradlew publishMavenJavaPublicationToCentralBundleRepository --no-daemon -PreleaseVersion="$RELEASE_VERSION"
+          python3 tools/prepare_central_bundle.py --repository build/central-repository --output build/central-bundle.zip --version "$RELEASE_VERSION"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: central-bundle-${{ steps.version.outputs.version }}
+          path: build/central-bundle.zip
+          if-no-files-found: error
+      - name: Publish bundle to Maven Central
+        env:
+          CENTRAL_BEARER_TOKEN: ${{ secrets.CENTRAL_BEARER_TOKEN }}
+        run: |
+          deployment_id=$(curl --silent --show-error --fail-with-body \
+            --request POST --header "Authorization: Bearer $CENTRAL_BEARER_TOKEN" \
+            --form bundle=@build/central-bundle.zip \
+            'https://central.sonatype.com/api/v1/publisher/upload?publishingType=AUTOMATIC')
+          if [[ ! "$deployment_id" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]]; then
+            echo 'Central did not return a deployment UUID' >&2
+            exit 1
+          fi
+          echo "Central deployment: $deployment_id" >> "$GITHUB_STEP_SUMMARY"
+          echo 'Upload accepted. Maven Central validation and publication continue asynchronously; verify the deployment in the Central Portal.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: gh release create "$RELEASE_TAG" build/central-bundle.zip j7m-deployer-cli/build/distributions/*.tar j7m-deployer-cli/build/distributions/*.zip --verify-tag --generate-notes

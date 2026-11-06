@@ -18,8 +18,8 @@
  */
 
 allprojects {
-    group = "org.j7m"
-    version = "0.1.0-SNAPSHOT"
+    group = "org.egothor"
+    version = providers.gradleProperty("releaseVersion").getOrElse("0.1.0-SNAPSHOT")
 }
 
 subprojects {

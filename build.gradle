@@ -24,3 +24,5 @@ apply from: "gradle/build-logic/root/40-architecture-and-reliability.gradle"
 apply from: "gradle/build-logic/root/50-application-platform-reports.gradle"
 apply from: "gradle/build-logic/root/60-sovereign-acceptance-report.gradle"
 apply from: "gradle/build-logic/root/70-documentation-platform.gradle"
+
+apply from: "gradle/build-logic/root/80-maven-central.gradle"
