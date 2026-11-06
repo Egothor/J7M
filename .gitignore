@@ -44,10 +44,12 @@ __pycache__/
 *.iml
 .vscode/
 
-# Local agent/tooling metadata
 .agents/
 .codex/
 AGENTS.md
+.findings/
+.fabric/
+INBOX/
 
 # OS-local files
 .DS_Store
