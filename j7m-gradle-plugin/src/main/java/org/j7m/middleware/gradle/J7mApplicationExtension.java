@@ -144,11 +144,26 @@ public abstract class J7mApplicationExtension {
     public abstract Property<String> getVerificationProfile();
 
     /**
-     * Safe local signing key identifier.
+     * Safe public signing key identifier for the application publisher.
      *
      * @return signing key identifier property
      */
     public abstract Property<String> getSigningKeyId();
+
+    /**
+     * Optional publisher private-key file, encoded as PKCS#8 DER Ed25519.
+     * Only the path is retained; private key bytes are read during signing and never logged.
+     * Configure this together with {@link #getSigningPublicKey()}.
+     * @return optional signing private-key file
+     */
+    public abstract RegularFileProperty getSigningPrivateKey();
+
+    /**
+     * Optional publisher public-key file, encoded as X.509 DER Ed25519.
+     * The same key is used to verify this project's signed bundle.
+     * @return optional signing public-key file
+     */
+    public abstract RegularFileProperty getSigningPublicKey();
 
     /**
      * Optional smoke-test service name for local run summaries.

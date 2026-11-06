@@ -52,9 +52,9 @@ public final class CoordinationNoConsensusBoundaryTest {
     @Test
     public void sourceAndDocsDoNotStartConsensus() throws Exception {
         Path root = root();
-        String docs = Files.readString(root.resolve("docs/internal/01000 - Normative Specifications/coordination.md"));
-        assertTrue(docs.contains("not consensus"));
-        assertTrue(docs.contains("not Raft"));
+        String docs = Files.readString(root.resolve("documentation/docs/programming/local-coordination.md"));
+        assertTrue(docs.contains("Independent instances do not form a replicated quorum"));
+        assertTrue(docs.contains("does not make it a Raft leader election"));
         String api = Files.readString(root.resolve("j7m-api/src/main/java/org/j7m/middleware/api/coordination/CoordinationService.java"));
         assertFalse(api.contains("majority commit"));
         assertFalse(api.contains("append entries"));

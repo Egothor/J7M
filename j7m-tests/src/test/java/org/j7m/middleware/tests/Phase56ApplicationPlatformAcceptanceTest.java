@@ -105,16 +105,6 @@ import org.junit.jupiter.api.io.TempDir;
  * Final Phase 5.6 application-platform acceptance audit tests.
  */
 final class Phase56ApplicationPlatformAcceptanceTest {
-    private static final List<String> REQUIRED_ACCEPTANCE_ROWS = List.of(
-            "JPMS module descriptors",
-            "ApplicationManager live activation",
-            "Unauthorized deploy denied",
-            "Workload processing example",
-            "Example build validation",
-            "Gradle plugin baseline",
-            "Deployer CLI baseline",
-            "No Phase 6/non-goal work started");
-
     @TempDir
     private Path temporaryDirectory;
 
@@ -188,43 +178,29 @@ final class Phase56ApplicationPlatformAcceptanceTest {
     }
 
     @Test
-    void phase56DocumentsAcceptanceReleaseReadinessAndExecutableExamples() throws IOException {
-        String acceptance = read("docs/internal/05000 - Acceptance and Evidence/phase-5-application-platform-acceptance.md");
-        for (String row : REQUIRED_ACCEPTANCE_ROWS) {
-            assertTrue(acceptance.contains("| " + row + " |"), "acceptance row missing: " + row);
+    void publicManualDocumentsDeploymentVerificationAndExecutableExamples() throws IOException {
+        String verification = read("documentation/docs/deployment/verification.md");
+        for (String boundary : List.of("Artifact", "Host", "Discovery", "Invocation", "Security",
+                "Limits", "Durable state", "Ownership", "Shutdown", "Observation")) {
+            assertTrue(verification.contains("| " + boundary + " |"), "verification boundary missing: " + boundary);
         }
-        assertTrue(acceptance.contains("## Security Audit"));
-        assertTrue(acceptance.contains("## Operational Audit"));
-        assertFalse(acceptance.contains("| PASS_WITH_LIMITATION |"));
-        assertTrue(acceptance.contains("runWorkloadProcessingExample"));
-        assertTrue(acceptance.contains("runStreamingPipelineExample"));
-        assertTrue(acceptance.contains("runRegulatedEnterpriseAppExample"));
-        assertTrue(acceptance.contains("runGradlePluginWorkflowDemo"));
-        assertTrue(acceptance.contains("runDeployerCliWorkflowDemo"));
-        assertTrue(acceptance.contains("runDeployerCliUpgradeRollbackDemo"));
-        assertFalse(acceptance.contains("remain documented placeholders"));
-        assertFalse(acceptance.contains("| PARTIAL |"));
-        assertFalse(acceptance.contains("| DEFERRED |"));
-        assertFalse(acceptance.contains("| FAIL |"));
-        assertTrue(acceptance.contains("Application resource limits visible where implemented"));
-        assertTrue(acceptance.contains("Current resource usage visible where implemented"));
+        assertTrue(verification.contains("checksum and accepted signature policy"));
+        assertTrue(verification.contains("Missing/wrong identity, context and permission are rejected"));
+        assertTrue(verification.contains("Admission stops and physical drain completes before final release"));
+        assertTrue(verification.contains("Do not infer exactly-once external effects"));
 
-        String readiness = read("docs/internal/04000 - Engineering Audits/phase-5-application-platform-release-readiness.md");
-        assertTrue(readiness.contains("This release is a Phase 5.2-5.6 application-platform baseline."));
-        assertTrue(readiness.contains("Known limitations"));
-        assertTrue(readiness.contains("Non-goal confirmation"));
-        assertTrue(readiness.contains("ACCEPT"));
-        assertTrue(readiness.contains("ACCEPT_PENDING_OWNER_COMMIT"));
-        assertTrue(readiness.contains("Canary-baseline returns a stable unsupported result"));
-        assertTrue(readiness.contains("PASS_WITH_LIMITATION=0"));
-        assertTrue(readiness.contains("PARTIAL=0"));
-        assertTrue(readiness.contains("DEFERRED=0"));
+        String evaluation = read("documentation/docs/overview/evaluation.md");
+        assertTrue(evaluation.contains("Unauthorized callers and incompatible schemas fail before business effects"));
+        assertTrue(evaluation.contains("retry does not silently repeat an unsafe effect"));
+        assertTrue(evaluation.contains("Queue capacity, overload, cancellation and shutdown remain bounded"));
 
-        String examples = read("docs/internal/01000 - Normative Specifications/examples.md");
-        assertFalse(examples.contains("Documentation Placeholders"));
-        assertTrue(examples.contains("runWorkloadProcessingExample"));
-        assertTrue(examples.contains("runStreamingPipelineExample"));
-        assertTrue(examples.contains("runRegulatedEnterpriseAppExample"));
+        String examples = read("documentation/docs/testing/verified-examples.md");
+        for (String entry : List.of("ContainerExample", "SchemaExample", "RuntimeExample", "QueueExample", "FailoverExample")) {
+            assertTrue(examples.contains("`" + entry + "`"), "executable example missing: " + entry);
+        }
+        assertTrue(examples.contains("documentation/tools/verify_examples.py --integration"));
+        assertTrue(examples.contains("not a copy of JUnit setup renamed as a production application"));
+        assertTrue(examples.contains("must not be mistaken for 80 independently executed distributed capabilities"));
     }
 
     @Test
@@ -282,9 +258,10 @@ final class Phase56ApplicationPlatformAcceptanceTest {
         assertTrue(phase6Report.contains("STATIC_POLICY_NO_BLOCKERS"));
         assertTrue(phase6Report.contains("These entries are report-generator evidence states, not synthesized task outcomes."));
 
-        String operations = read("docs/internal/01000 - Normative Specifications/java-25-runtime-notes.md");
+        String operations = read("documentation/docs/deployment/verification.md");
         assertTrue(operations.contains("grpc-netty-shaded"));
-        assertTrue(operations.contains("Validation Does Not Fail"));
+        assertTrue(operations.contains("--enable-native-access=ALL-UNNAMED"));
+        assertTrue(operations.contains("--sun-misc-unsafe-memory-access=allow"));
         assertTrue(operations.contains("native"));
         assertTrue(operations.contains("Unsafe"));
     }
@@ -368,7 +345,7 @@ final class Phase56ApplicationPlatformAcceptanceTest {
     }
 
     private Path exampleJar() {
-        Path jar = projectPath("j7m-examples/build/libs/j7m-examples-0.1.0-SNAPSHOT.jar");
+        Path jar = Path.of(System.getProperty("j7m.test.exampleJar"));
         assertDoesNotThrow(() -> Files.size(jar));
         return jar;
     }

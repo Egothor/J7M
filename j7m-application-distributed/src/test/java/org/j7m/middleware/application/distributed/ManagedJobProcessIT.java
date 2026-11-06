@@ -102,13 +102,24 @@ class ManagedJobProcessIT {
         }
     }
     @Test void allowAdmitsDistinctRunsOnTwoActualWorkersWhileBothOwnedChildrenRemainHeld() throws Exception {
+        assertEquals(0,parallelRuns(false));
+    }
+    @Test void allowRestoresCommittedCheckpointAfterLostProgressReplyWithoutDuplicatingEffects() throws Exception {
+        assertEquals(1,parallelRuns(true));
+    }
+    private int parallelRuns(boolean loseProgressReply) throws Exception {
         var artifact=GeneratedJobService.compile(directory.resolve("signed"));var fixture=new ManagedSagaProcessIT();fixture.directory=directory;
-        try(var cluster=fixture.new Cluster();var sink=new ServerSocket(0);var first=frontend(cluster,artifact,sink,"first",false,"parallel");var second=frontend(cluster,artifact,sink,"second",false,"parallel")) {
+        try(var cluster=fixture.new Cluster();var sink=new ServerSocket(0);var first=frontend(cluster,artifact,sink,"first",false,loseProgressReply?"parallel-progress-reply-loss":"parallel");var second=frontend(cluster,artifact,sink,"second",false,"parallel")) {
             sink.setSoTimeout(12000);first.command("START one");first.command("START two");
             try(var a=receive(sink);var b=receive(sink)) {
-                assertEquals(Set.of("one","two"),Set.of(a.logical(),b.logical()));assertEquals("checkpoint",a.phase());assertEquals("checkpoint",b.phase());
+                assertEquals(Set.of("one","two"),Set.of(a.logical(),b.logical()));
+                assertNotEquals(heldOwner(first,a),heldOwner(first,b),"Both live runs require distinct worker owners");
                 assertNotEquals(a.fence(),b.fence());
-                assertTrue(first.command("STATUS one").startsWith("STATUS RUNNING "));assertTrue(first.command("STATUS two").startsWith("STATUS RUNNING "));
+                if(loseProgressReply){
+                    assertEquals("FAULTS 1",first.command("FAULTS"));
+                    assertTrue(a.phase().equals("restored")||b.phase().equals("restored"),"The lost committed reply must exercise actual checkpoint recovery");
+                }
+                assertEquals("FAULTS 0",second.command("FAULTS"));
                 a.complete();b.complete();
             }
             long end=System.nanoTime()+TimeUnit.SECONDS.toNanos(5);
@@ -116,7 +127,21 @@ class ManagedJobProcessIT {
                 while(!first.command("STATUS "+id).startsWith("STATUS COMPLETED ")) {assertTrue(System.nanoTime()<end);java.util.concurrent.locks.LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(5));}
                 assertEquals("RESULT checkpointed:input:done",first.command("RESULT "+id));assertEquals("READ checkpointed:input",first.command("READ "+id));
             }
-            stopped(first);stopped(second);
+            sink.setSoTimeout(250);assertThrows(SocketTimeoutException.class,()->receive(sink),"Completed runs cannot redeliver another application body");
+            int faults=Integer.parseInt(first.command("FAULTS").substring("FAULTS ".length()));
+            stopped(first);stopped(second);return faults;
         }
+    }
+    private static String heldOwner(ManagedEventSubscriptionProcessIT.Child frontend,Delivery delivery) throws Exception {
+        // A committed checkpoint can be restored before any sink exchange after a lost reply.
+        assertTrue(Set.of("checkpoint","restored").contains(delivery.phase()),"Unexpected application phase: "+delivery.phase());
+        assertEquals("checkpointed:input",delivery.state());assertTrue(delivery.fence()>0);
+        String[] claim=frontend.command("CLAIM "+delivery.logical()).split(" ");
+        assertEquals(5,claim.length);assertEquals("CLAIM",claim[0]);assertEquals("RUNNING",claim[1]);
+        assertEquals(Long.toString(delivery.fence()),claim[2],"The held callback must retain the current native fence");
+        assertFalse(claim[3].isBlank());assertEquals("true",claim[4],"A checkpoint must actually be persisted");
+        assertEquals("PROGRESS checkpointed:input-progress",frontend.command("PROGRESS "+delivery.logical()));
+        assertEquals("READ absent",frontend.command("READ "+delivery.logical()),"Protected effects commit only after physical completion");
+        return claim[3];
     }
 }

@@ -52,16 +52,16 @@ class ReleaseTagTest(unittest.TestCase):
 
 
 class PublicationScopeTest(unittest.TestCase):
-    """The release allowlist covers middleware use without development/test tools."""
+    """The release allowlist covers middleware use including required developer tools."""
 
-    def test_includes_runtime_features_and_excludes_build_and_test_tools(self):
-        """The intended runtime feature set has seventeen separately consumable modules."""
-        self.assertEqual(17, len(ARTIFACTS))
+    def test_includes_runtime_and_developer_tools_but_excludes_internal_tests(self):
+        """The public set includes runtime modules and the required developer tooling."""
+        self.assertEqual(20, len(ARTIFACTS))
         self.assertTrue({"j7m-api", "j7m-kernel", "j7m-runtime", "j7m-application-platform",
                          "j7m-transport-grpc", "j7m-transport-rmi", "j7m-adapter-spi",
                          "j7m-application-distributed", "j7m-cluster-management"}.issubset(ARTIFACTS))
-        excluded = {"j7m-annotation-processor", "j7m-deployer-cli", "j7m-gradle-plugin",
-                    "j7m-adapter-tck", "j7m-testkit", "j7m-examples", "j7m-demo", "j7m-tests"}
+        self.assertTrue({"j7m-annotation-processor", "j7m-gradle-plugin", "j7m-deployer-cli"}.issubset(ARTIFACTS))
+        excluded = {"j7m-adapter-tck", "j7m-testkit", "j7m-examples", "j7m-demo", "j7m-tests"}
         self.assertFalse(ARTIFACTS & excluded)
 
     def test_runtime_project_dependencies_are_in_published_inventory(self):
@@ -146,8 +146,7 @@ class CentralBundleTest(unittest.TestCase):
     def test_rejects_dependency_on_unpublished_tools(self):
         """A runtime artifact cannot silently require an excluded tool or test library."""
         original = self.pom.read_text()
-        for artifact in ("j7m-annotation-processor", "j7m-deployer-cli", "j7m-gradle-plugin",
-                         "j7m-adapter-tck", "j7m-testkit"):
+        for artifact in ("j7m-adapter-tck", "j7m-testkit"):
             dependency = f"<dependencies><dependency><groupId>org.egothor</groupId><artifactId>{artifact}</artifactId><version>1.2.3</version></dependency></dependencies>"
             self.pom.write_text(original.replace("</project>", dependency + "</project>"))
             with self.subTest(artifact=artifact), self.assertRaisesRegex(ValueError, "unpublished J7M dependency"):

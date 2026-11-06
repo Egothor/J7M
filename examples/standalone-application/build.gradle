@@ -1,0 +1,101 @@
+// Copyright (c) 2026, Leo Galambos and the Egothor team
+// SPDX-License-Identifier: BSD-4-Clause
+buildscript {
+    repositories {
+        if (project.hasProperty('j7mRepository')) {
+            exclusiveContent {
+                forRepository { maven { url = uri(project.property('j7mRepository')) } }
+                filter { includeGroup 'org.egothor' }
+            }
+        }
+        mavenCentral()
+    }
+    dependencies { classpath "org.egothor:j7m-gradle-plugin:${project.property('j7mVersion')}" }
+}
+apply plugin: 'java'
+apply plugin: 'org.j7m.application'
+
+repositories {
+    if (project.hasProperty('j7mRepository')) {
+            exclusiveContent {
+                forRepository { maven { url = uri(project.property('j7mRepository')) } }
+                filter { includeGroup 'org.egothor' }
+            }
+        }
+    mavenCentral()
+}
+java { toolchain { languageVersion = JavaLanguageVersion.of(25) } }
+configurations { j7mPlatform }
+dependencies {
+    compileOnly "org.egothor:j7m-api:${j7mVersion}"
+    annotationProcessor "org.egothor:j7m-annotation-processor:${j7mVersion}"
+    j7mPlatform "org.egothor:j7m-deployer-cli:${j7mVersion}"
+}
+
+// These keys belong to this application publisher, not to Maven Central signing.
+tasks.register('generateSigningKey') {
+    def privateFile = layout.buildDirectory.file('signing/private.der')
+    def publicFile = layout.buildDirectory.file('signing/public.der')
+    outputs.files(privateFile, publicFile)
+    doLast {
+        if (privateFile.get().asFile.exists() || publicFile.get().asFile.exists()) {
+            if (!privateFile.get().asFile.isFile() || !publicFile.get().asFile.isFile()) {
+                throw new GradleException('Incomplete existing signing key pair')
+            }
+        } else {
+            def pair = java.security.KeyPairGenerator.getInstance('Ed25519').generateKeyPair()
+            def keyDirectory = privateFile.get().asFile.parentFile.toPath()
+            java.nio.file.Files.createDirectories(keyDirectory)
+            if (java.nio.file.Files.getFileStore(keyDirectory).supportsFileAttributeView('posix')) {
+                java.nio.file.Files.setPosixFilePermissions(keyDirectory,
+                    java.nio.file.attribute.PosixFilePermissions.fromString('rwx------'))
+                def permissions = java.nio.file.attribute.PosixFilePermissions.asFileAttribute(
+                    java.nio.file.attribute.PosixFilePermissions.fromString('rw-------'))
+                java.nio.file.Files.createFile(privateFile.get().asFile.toPath(), permissions)
+            } else {
+                throw new GradleException('Use externally protected Ed25519 key files on non-POSIX systems')
+            }
+            java.nio.file.Files.write(privateFile.get().asFile.toPath(), pair.private.encoded)
+            publicFile.get().asFile.bytes = pair.public.encoded
+        }
+    }
+}
+j7m {
+    manifest.set(layout.projectDirectory.file('META-INF/j7m-application.json'))
+    bundleFile.set(layout.buildDirectory.file('distributions/hello.j7m'))
+    signingKeyId.set('publisher')
+    signingPrivateKey.set(layout.buildDirectory.file('signing/private.der'))
+    signingPublicKey.set(layout.buildDirectory.file('signing/public.der'))
+    verificationProfile.set('strict-production')
+}
+tasks.named('j7mSign') { dependsOn 'generateSigningKey' }
+tasks.register('preparePlatformConfiguration') {
+    dependsOn 'j7mVerify'
+    inputs.file(layout.projectDirectory.file('conf/developer.properties'))
+    inputs.file(j7m.bundleFile)
+    outputs.file(layout.buildDirectory.file('platform.properties'))
+    doLast {
+        def properties = new Properties()
+        file('conf/developer.properties').withInputStream { properties.load(it) }
+        def digest = java.security.MessageDigest.getInstance('SHA-256')
+        j7m.bundleFile.get().asFile.withInputStream { input ->
+            byte[] block = new byte[65536]
+            int count
+            while ((count = input.read(block)) != -1) digest.update(block, 0, count)
+        }
+        // Development builds may keep one coordinate while their bytes change.
+        // Isolate them without weakening the installed platform's immutable repository.
+        properties.setProperty('repository.path', 'platform-repository/' + digest.digest().encodeHex().toString())
+        layout.buildDirectory.file('platform.properties').get().asFile.withOutputStream {
+            properties.store(it, 'Paths relative to this generated configuration')
+        }
+    }
+}
+// Host libraries stay outside the application bundle and its application classloader.
+tasks.register('run', JavaExec) {
+    dependsOn 'preparePlatformConfiguration'
+    classpath = configurations.j7mPlatform
+    mainClass = 'org.j7m.middleware.deployer.cli.J7mPlatform'
+    args '--config', layout.buildDirectory.file('platform.properties').get().asFile.absolutePath
+    jvmArgs '--enable-native-access=ALL-UNNAMED', '--sun-misc-unsafe-memory-access=allow'
+}

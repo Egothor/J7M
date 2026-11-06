@@ -22,6 +22,17 @@ dependencies {
     testRuntimeOnly libs.junit.platform.launcher
 }
 
+// Tests consume the artifact produced by this build, including release versions.
+def exampleJarTask = project(":j7m-examples").tasks.named("jar", Jar)
+def exampleJarFile = exampleJarTask.flatMap { Jar task -> task.archiveFile }
+tasks.withType(Test).configureEach { Test task ->
+    task.dependsOn exampleJarTask
+    task.inputs.file(exampleJarFile).withPropertyName("exampleJar")
+    task.doFirst {
+        task.systemProperty "j7m.test.exampleJar", exampleJarFile.get().asFile.absolutePath
+    }
+}
+
 tasks.named("test") {
     dependsOn ":j7m-examples:jar"
     dependsOn ":examples:modular-hello-api:jar"

@@ -20,4 +20,4 @@ The documentation serves application developers, deployment engineers and operat
 | Product orientation | [J7M overview](../overview/index.md) |
 | Current capabilities and boundaries | [Capabilities](../overview/capabilities.md) |
 
-Documentation owner: the J7M project maintainers. Source review date for this edition: 25 October 2026. Review affected pages whenever a public API, annotation consumer, configuration default, durable protocol or deployment boundary changes. Historical development notes are background sources; current verified implementation facts govern the user-facing manual.
+Current implementation contracts and verified behavior govern the user-facing manual.

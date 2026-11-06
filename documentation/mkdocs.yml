@@ -57,6 +57,7 @@ nav:
 - Get Started:
   - Start Here: getting-started/index.md
   - Requirements: getting-started/prerequisites.md
+  - Your Gradle Project: getting-started/developer-project.md
   - Build J7M: getting-started/build.md
   - Your First Application: getting-started/first-application.md
   - Separate JVMs: getting-started/separate-jvms.md
@@ -122,6 +123,7 @@ nav:
   - Limits and Observability: configuration/limits-observability.md
 - Deployment:
   - Overview: deployment/index.md
+  - Install and Run the Platform: deployment/installed-platform.md
   - Artifacts: deployment/artifacts.md
   - Topologies: deployment/topologies.md
   - Signed Applications: deployment/signed-applications.md

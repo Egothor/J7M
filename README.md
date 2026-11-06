@@ -17,7 +17,22 @@ The runtime is built around concrete `ObjectRef` identities rather than ordinary
 ## Requirements
 
 - Java 25.
-- The repository Gradle wrapper.
+- The repository Gradle wrapper when building J7M itself.
+
+## Use a J7M release
+
+- **Application developers:** [create a standalone Gradle project](documentation/docs/getting-started/developer-project.md)
+  with the published API, annotation processor and packaging plugin. The
+  downloadable starter includes its Gradle wrapper and a working run task.
+- **Application operators:** [download and install the J7M platform](documentation/docs/deployment/installed-platform.md),
+  configure the application's public trust key and start its signed bundle.
+  This path needs Java 25, not Gradle or a J7M source checkout.
+
+Select a version whose Maven artifacts are published and whose GitHub release
+contains the platform and starter archives. A release tag or source tree alone
+does not make those artifacts available.
+
+## Build J7M from source
 
 Build the repository:
 
@@ -71,7 +86,7 @@ The main implementation is split across bounded Gradle modules:
 - `j7m-annotation-processor` generates explicit schema adapters and finite component indexes at compilation; application runtimes consume their public SPI without depending on the compiler module.
 - Managed applications: [POJO hosting](j7m-application-platform/MANAGED-POJO-HOSTING.md), [dependency injection](j7m-application-platform/MANAGED-CONTAINER.md), [live configuration](j7m-application-platform/CONFIGURATION.md) and [host policies](j7m-application-platform/MANAGED-HOST-POLICIES.md).
 - `j7m-transport-grpc` and `j7m-transport-rmi` provide concrete transports.
-- `j7m-application-platform`, `j7m-deployer-cli`, and `j7m-gradle-plugin` support packaging, verification, deployment, and local tooling; the opt-in authenticated [network repository](j7m-application-platform/NETWORK-REPOSITORY.md) adds verified resumable artifact transfer.
+- `j7m-application-platform`, `j7m-deployer-cli`, and `j7m-gradle-plugin` support packaging, verification, deployment, the installed single-application platform host and local tooling; the opt-in authenticated [network repository](j7m-application-platform/NETWORK-REPOSITORY.md) adds verified resumable artifact transfer.
 - `j7m-durable-log`, `j7m-messaging`, `j7m-coordination`, `j7m-consensus`, `j7m-saga`, and `j7m-isolation` provide sovereign reliability and isolation capabilities.
 - `j7m-distributed-core` adds opt-in quorum-backed resources, leases, coordination, participating-resource transactions, retained events, fenced migration, replicated queues, durable jobs/sagas and deduplicated RPC; see its [contract and limits](j7m-distributed-core/README.md).
 - `j7m-integrations` connects application JDBC transactions to replicated queues through a transactional outbox/inbox and provides concrete OpenTelemetry/Prometheus export; see its [contracts and verification limits](j7m-integrations/README.md).

@@ -2,6 +2,10 @@
 
 The `org.j7m.application` Gradle plugin packages, signs, verifies and publishes J7M bundles to a local application repository. Its runtime lifecycle tasks currently report unavailable state; use a live host's application manager or Nugget administration for real activation and shutdown.
 
+For a complete independent project, use [the developer starter](../getting-started/developer-project.md).
+Its `run` task launches the executable platform host. Operators can instead
+[download and install that host](installed-platform.md) without Gradle.
+
 ## Build version and configuration cache
 
 The repository wrapper pins Gradle 9.8.2 and verifies the distribution's SHA-256 checksum. Use `./gradlew` with Java 25 for repository builds.
@@ -19,13 +23,20 @@ The plugin workflows above are tested on Gradle 9.8.2 with configuration cache a
 
 ## Configure packaging
 
-This Groovy build fragment assumes the J7M plugin is available to the build through the project's configured plugin resolution:
+Resolve the plugin implementation from Maven Central under `org.egothor`.
+Replace `0.9.9` with a published J7M version. The existing plugin ID is applied
+from that implementation; it does not require a plugin marker under `org.j7m`:
 
 ```groovy
-plugins {
-    id 'java'
-    id 'org.j7m.application'
+buildscript {
+    repositories { mavenCentral() }
+    dependencies {
+        classpath 'org.egothor:j7m-gradle-plugin:0.9.9'
+    }
 }
+
+plugins { id 'java' }
+apply plugin: 'org.j7m.application'
 
 j7m {
     manifest.set(layout.projectDirectory.file(
@@ -60,3 +71,20 @@ The manifest must match the actual libraries or JPMS modules in the bundle. `lib
 This executes the package → sign → verify → publish chain. It does not start an application server or prove that a service is running. The lifecycle/status dependency chain is not a remote operator console.
 
 Profiles are `development`, `strict-production` and `strict-regulated`. Selecting a strict profile does not provision a production signing authority or trusted key material. `signingKeyId` is safe configuration metadata, not a private-key store; the bundled local signing workflow must not be presented as a production KMS integration. See [signed applications](signed-applications.md), [repositories](repositories.md) and [enterprise integrations](../security/enterprise-integrations.md).
+
+For a bundle another installation will trust, configure explicit Ed25519 key
+files rather than relying on the plugin's local development signer:
+
+```groovy
+j7m {
+    signingKeyId.set('publisher')
+    signingPrivateKey.set(layout.projectDirectory.file('signing/private.der'))
+    signingPublicKey.set(layout.projectDirectory.file('signing/public.der'))
+    verificationProfile.set('strict-production')
+}
+```
+
+The private file is PKCS#8 DER; the public file is X.509 DER. The public key
+must match the private key. Supply only the public file and key ID to the
+operator. The standalone starter includes `generateSigningKey` as an example
+project task; it is not an implicit key-provisioning service provided by the plugin.

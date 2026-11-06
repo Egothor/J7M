@@ -51,88 +51,63 @@ import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 
 /**
- * Deterministic documentation consistency checks for the implemented
- * Phase 7.0-7.11 nugget operations-plane surface.
+ * Checks the public operations manual against implemented administration
+ * families and the provider, authorization and uncertain-outcome boundaries.
  */
 public final class NuggetPhase7DocumentationConsistencyTest {
     private static final Path ROOT = repositoryRoot();
 
     @Test
-    void architectureDocumentReflectsImplementedPhaseSevenSurface() throws IOException {
-        String architecture = read("docs/internal/03000 - Architecture Decisions/phase-7-nugget-operations-plane.md");
+    void architectureDocumentReflectsImplementedOperationsSurface() throws IOException {
+        String architecture = read("documentation/docs/overview/architecture.md");
+        String inspection = read("documentation/docs/operations/inspection.md");
+        String contract = read("documentation/docs/reference/admin-api.md");
 
-        assertContains(architecture, "Current Implementation Status Through Phase 7.11");
-        assertContains(architecture, "Public operations contracts | Implemented");
-        assertContains(architecture, "Headless in-process admin runtime | Implemented");
-        assertContains(architecture, "PIN admission and verifier ownership | Implemented");
-        assertContains(architecture, "Local and configured discovery | Implemented");
-        assertContains(architecture, "CLI nugget console | Implemented");
-        assertContains(architecture, "Expanded Phase 7.5 inspection surface | Implemented-ready-for-terminal-verification");
-        assertContains(architecture, "Application lifecycle mutations | Implemented-ready-for-terminal-verification");
-        assertContains(architecture, "Nugget shutdown and kill controls | Implemented-ready-for-Phase-7.7-focused-review");
-        assertContains(architecture, "Admin API contract for future Web/API | Implemented-ready-for-Phase-7.8-focused-review");
-        assertContains(architecture, "server-owned callback timeout monitoring");
-        assertContains(architecture, "retained timeout/unknown replay status");
-        assertContains(architecture, "Phase 7.9 security hardening | Implemented-ready-for-Phase-7.9-focused-review");
-        assertContains(architecture, "Phase 7.10 demos, examples, docs, and evidence | Implemented-ready-for-Phase-7.10-focused-review");
-        assertContains(architecture, "Phase 7.11 final operations-plane acceptance evidence | Implemented-ready-for-owner-commit-and-final-review");
-        assertContains(architecture, "Script mode, remote transport, web/API adapter, and deep invocation drain gate | Deferred");
-        assertContains(architecture, "Phase 7.0-7.11 Availability Confirmation");
-
-        assertStaleClaimAbsent(architecture, "without starting the runtime endpoint");
-        assertStaleClaimAbsent(architecture, "PIN runtime, discovery runtime");
-        assertStaleClaimAbsent(architecture, "It is not an interactive distributed operations shell yet");
-        assertStaleClaimAbsent(architecture, "Phase 7.0 does not implement the protocol");
-        assertStaleClaimAbsent(architecture, "no Phase 7 production API, runtime, discovery, or CLI implementation exists yet");
-        assertStaleClaimAbsent(architecture, "Phase 7.0 does not implement the nugget admin endpoint");
+        assertContains(architecture, "A Nugget is the host");
+        assertContains(architecture, "ApplicationManager");
+        assertContains(inspection, "provider-backed `nugget` command family");
+        assertContains(inspection, "concrete connection/discovery provider must be installed");
+        assertContains(contract, "Discovery | `NuggetDiscoveryService`");
+        assertContains(contract, "Admission | `authenticate(NuggetAuthenticationRequest, char[])`");
+        assertContains(contract, "Introspection | `NuggetIntrospection`");
+        assertContains(contract, "Application lifecycle | `NuggetApplicationLifecycle`");
+        assertContains(contract, "Nugget control | `NuggetControl`");
+        assertContains(contract, "A timeout after acceptance can leave an effect in progress or uncertain");
+        assertContains(contract, "Preserve its operation identity and reconcile/status-check it");
     }
 
     @Test
-    void operationsDocumentsKeepRemoteTransportAndLaterFeaturesDeferred() throws IOException {
-        String admin = read("docs/internal/01000 - Normative Specifications/nugget-admin.md");
-        String cli = read("docs/internal/01000 - Normative Specifications/j7m-cli-console.md");
+    void operationsDocumentsPreserveProviderAndTransportBoundaries() throws IOException {
+        String admin = read("documentation/docs/reference/admin-api.md");
+        String cli = read("documentation/docs/reference/cli.md");
+        String json = read("documentation/docs/reference/admin-json.md");
+        String operations = read("documentation/docs/operations/index.md");
 
-        assertContains(admin, "in-process headless admission");
+        assertContains(admin, "transport-neutral administration");
+        assertContains(admin, "It starts no listener and grants no authorization");
         assertContains(admin, "read-only introspection");
-        assertContains(admin, "Phase 7.3 headless");
-        assertContains(admin, "local/configured nugget discovery");
-        assertContains(admin, "Phase 7.7 nugget controls");
-        assertContains(admin, "Phase 7.8 adds additive public admin-contract primitives");
-        assertContains(admin, "server-owned control execution budgets");
-        assertContains(admin, "Replay with the same operation id returns the retained");
-        assertContains(admin, "without canceling, interrupting, or awaiting the current callback's own future");
-        assertContains(admin, "self-aware cleanup does not suppress the");
-        assertContains(admin, "network administration protocol");
-        assertContains(admin, "remain future Phase 7 work");
-
-        assertContains(cli, "interactive nugget shell");
-        assertContains(cli, "one-shot nugget commands");
-        assertContains(cli, "does");
-        assertContains(cli, "not implement a concrete network administration");
-        assertContains(cli, "Phase 7.7 shell commands");
-        assertContains(cli, "representative inspection");
-        assertContains(cli, "ps --wide");
-        assertContains(cli, "start COORDINATE [--dry-run]");
+        assertContains(admin, "Servers still enforce their own deadlines");
+        assertContains(admin, "do not silently replay a lifecycle mutation against a new target generation");
+        assertContains(cli, "installed `NuggetCliClientProvider`");
+        assertContains(cli, "does not install a network listener or remote administration protocol");
+        assertContains(cli, "start COORDINATE");
         assertContains(cli, "shutdown-nugget NUGGET");
         assertContains(cli, "kill-nugget NUGGET");
-        assertContains(cli, "Script or command-stream mode is not implemented");
-        assertContains(cli, "does not persist command history");
-
-        String contract = read("docs/internal/01000 - Normative Specifications/nugget-admin-api-contract.md");
-        String json = read("docs/internal/01000 - Normative Specifications/nugget-admin-json.md");
-        String resourceMap = read("docs/internal/03000 - Architecture Decisions/nugget-web-api-resource-map.md");
-
-        assertContains(contract, "unsupported request protocol version");
-        assertContains(json, "Unknown fields");
-        assertContains(resourceMap, "/nuggets/{id}/objects/{objectId}");
+        assertContains(cli, "Kill remains disabled unless the host explicitly implements and enables it");
+        assertContains(cli, "does not automatically retry an uncertain mutation against a replacement process");
+        assertContains(cli, "--wide");
+        assertContains(cli, "--dry-run");
+        assertContains(json, "Extra properties and unsupported variants are rejected");
+        assertContains(json, "does not infer an HTTP route, listener, authentication header, browser session");
+        assertContains(operations, "does not imply a browser administration console, a fleet-wide controller");
     }
 
     @Test
     void phaseSevenDocumentsAndEvidenceDoNotMakeForbiddenHardeningClaims() throws IOException {
-        String text = read("docs/internal/01000 - Normative Specifications/nugget-admin.md")
-                + read("docs/internal/01000 - Normative Specifications/j7m-cli-console.md")
-                + read("docs/internal/06000 - Security Reviews/nugget-pin-security.md")
-                + read("docs/internal/02000 - Milestone Plans/J7M_Phase_7_Nugget_Operations_Plane_Milestones.md")
+        String text = read("documentation/docs/reference/admin-api.md")
+                + read("documentation/docs/reference/cli.md")
+                + read("documentation/docs/security/administrative-pin.md")
+                + read("documentation/docs/security/isolation-providers.md")
                 + read("j7m-tests/build.gradle");
 
         assertStaleClaimAbsent(text, "PIN admission is complete authorization");
@@ -159,7 +134,7 @@ public final class NuggetPhase7DocumentationConsistencyTest {
         Path current = Path.of("").toAbsolutePath().normalize();
         while (current != null) {
             if (Files.isRegularFile(current.resolve("README.md"))
-                    && Files.isDirectory(current.resolve("docs"))) {
+                    && Files.isDirectory(current.resolve("documentation/docs"))) {
                 return current;
             }
             current = current.getParent();

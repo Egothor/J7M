@@ -11,9 +11,12 @@ import org.gradle.api.publish.maven.tasks.PublishToMavenRepository
  * Root rationale: all publications share identity and one Central bundle repository.
  * Related validation tasks: publishMavenJavaPublicationToCentralBundleRepository;
  * tools/test_prepare_central_bundle.py validates complete bundle contents.
- * Runtime-only scope is shared with the bundle validator through the manifest.
+ * Consumer artifact scope is shared with the bundle validator through the manifest.
  */
 def releaseVersion = providers.gradleProperty("releaseVersion")
+def consumerValidation = gradle.startParameter.taskNames.any {
+    it.endsWith("stageConsumerPublications") || it.endsWith("ToConsumerValidationRepository") || it.endsWith("validateConsumerDistribution") || it.endsWith("releaseChecksums")
+}
 if (releaseVersion.isPresent() && (!(releaseVersion.get() ==~ /[0-9]+\.[0-9]+\.[0-9]+(?:-[A-Za-z0-9]+(?:[.-][A-Za-z0-9]+)*)?/) ||
         releaseVersion.get().toUpperCase(Locale.ROOT).contains("SNAPSHOT"))) {
     throw new GradleException("releaseVersion must be a non-SNAPSHOT release version such as 1.2.3 or 1.2.3-rc.1")
@@ -26,6 +29,9 @@ configure(centralModules.collect { project(":${it}") }) { module ->
     apply plugin: "maven-publish"
     apply plugin: "signing"
 
+    pluginManager.withPlugin("java-gradle-plugin") {
+        gradlePlugin.automatedPublishing = false
+    }
     publishing {
         publications {
             mavenJava(MavenPublication) {
@@ -60,6 +66,10 @@ configure(centralModules.collect { project(":${it}") }) { module ->
         }
         repositories {
             maven {
+                name = "consumerValidation"
+                url = rootProject.layout.buildDirectory.dir("consumer-maven")
+            }
+            maven {
                 name = "centralBundle"
                 url = rootProject.layout.buildDirectory.dir("central-repository")
             }
@@ -70,11 +80,14 @@ configure(centralModules.collect { project(":${it}") }) { module ->
         if (signingKey.isPresent()) {
             useInMemoryPgpKeys(signingKey.get(), providers.environmentVariable("MAVEN_SIGNING_PASSWORD").orNull)
         }
-        required = true
+        required = !consumerValidation
         sign publishing.publications.mavenJava
     }
     tasks.withType(PublishToMavenRepository).configureEach {
         doFirst {
+            if (consumerValidation && repository.name != "consumerValidation") {
+                throw new GradleException("Unsigned consumer qualification cannot publish to other repositories")
+            }
             if (repository.name == "centralBundle" && !releaseVersion.isPresent()) {
                 throw new GradleException("Central staging requires -PreleaseVersion=<release version>")
             }

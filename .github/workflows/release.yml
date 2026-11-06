@@ -6,6 +6,16 @@ name: Release
 on:
   push:
     tags: ['release@*']
+  workflow_dispatch:
+    inputs:
+      release_version:
+        description: Release version to validate and stage
+        required: true
+        type: string
+      dry_run:
+        description: Run tests and build packages without signing or publishing
+        default: true
+        type: boolean
 
 permissions:
   contents: read
@@ -28,15 +38,28 @@ jobs:
         id: version
         env:
           RELEASE_TAG: ${{ github.ref_name }}
+          EVENT_NAME: ${{ github.event_name }}
+          MANUAL_VERSION: ${{ inputs.release_version }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          RELEASE_REF: ${{ github.ref }}
         run: |
+          if [[ "$EVENT_NAME" == workflow_dispatch ]]; then
+            RELEASE_TAG="release@$MANUAL_VERSION"
+            if [[ "$DRY_RUN" != true && "$RELEASE_REF" != "refs/tags/$RELEASE_TAG" ]]; then
+              echo 'A publishing dispatch must select the exact release tag.' >&2
+              exit 1
+            fi
+          fi
           version=$(python3 tools/prepare_central_bundle.py --tag "$RELEASE_TAG")
           echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '25'
       - uses: gradle/actions/setup-gradle@v4
       - name: Validate release configuration
+        if: github.event_name == 'push' || !inputs.dry_run
         env:
           CENTRAL_BEARER_TOKEN: ${{ secrets.CENTRAL_BEARER_TOKEN }}
           MAVEN_SIGNING_KEY: ${{ secrets.MAVEN_SIGNING_KEY }}
@@ -50,7 +73,7 @@ jobs:
       - name: Build, test and validate Javadoc
         env:
           RELEASE_VERSION: ${{ steps.version.outputs.version }}
-        run: ./gradlew clean check javadoc :j7m-deployer-cli:distTar :j7m-deployer-cli:distZip --no-daemon -PreleaseVersion="$RELEASE_VERSION"
+        run: ./gradlew clean check javadoc :j7m-deployer-cli:distTar :j7m-deployer-cli:distZip releaseChecksums validateConsumerDistribution --no-daemon -PreleaseVersion="$RELEASE_VERSION"
       - name: Retain failed test diagnostics
         if: failure()
         uses: actions/upload-artifact@v4
@@ -61,6 +84,7 @@ jobs:
             **/build/reports/tests/test/**
           if-no-files-found: ignore
       - name: Stage signed Maven publications
+        if: github.event_name == 'push' || !inputs.dry_run
         env:
           RELEASE_VERSION: ${{ steps.version.outputs.version }}
           MAVEN_SIGNING_KEY: ${{ secrets.MAVEN_SIGNING_KEY }}
@@ -69,11 +93,13 @@ jobs:
           ./gradlew publishMavenJavaPublicationToCentralBundleRepository --no-daemon -PreleaseVersion="$RELEASE_VERSION"
           python3 tools/prepare_central_bundle.py --repository build/central-repository --output build/central-bundle.zip --version "$RELEASE_VERSION"
       - uses: actions/upload-artifact@v4
+        if: github.event_name == 'push' || !inputs.dry_run
         with:
           name: central-bundle-${{ steps.version.outputs.version }}
           path: build/central-bundle.zip
           if-no-files-found: error
       - name: Upload bundle for manual Maven Central publication
+        if: github.event_name == 'push' || !inputs.dry_run
         env:
           CENTRAL_BEARER_TOKEN: ${{ secrets.CENTRAL_BEARER_TOKEN }}
         run: |
@@ -88,7 +114,8 @@ jobs:
           echo "Central deployment: $deployment_id" >> "$GITHUB_STEP_SUMMARY"
           echo 'Upload accepted for validation. After the deployment reaches VALIDATED, publish it manually in the Central Portal.' >> "$GITHUB_STEP_SUMMARY"
       - name: Create GitHub release
+        if: github.event_name == 'push' || !inputs.dry_run
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ github.ref_name }}
-        run: gh release create "$RELEASE_TAG" build/central-bundle.zip j7m-deployer-cli/build/distributions/*.tar j7m-deployer-cli/build/distributions/*.zip --verify-tag --generate-notes
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+        run: gh release create "$RELEASE_TAG" build/central-bundle.zip build/distributions/j7m-starter-*.zip build/distributions/j7m-hello-*.zip build/distributions/SHA256SUMS j7m-deployer-cli/build/distributions/*.tar j7m-deployer-cli/build/distributions/*.tar.gz j7m-deployer-cli/build/distributions/*.zip --verify-tag --generate-notes

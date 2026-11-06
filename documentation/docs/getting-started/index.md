@@ -1,6 +1,8 @@
 # Getting started
 
-Start with a small executable example, then add remote communication and the host capabilities your application actually needs. You do not need to implement a framework-specific service interface to use generated component wiring.
+If you are building your own application, start with the [standalone Gradle project](developer-project.md). If you have an application bundle to operate, use [the installed J7M platform](../deployment/installed-platform.md). Neither procedure requires a J7M source checkout once the matching release artifacts are available.
+
+The source-checkout exercises below explain the individual mechanisms before adding remote communication and trusted host capabilities. You do not need to implement a framework-specific service interface to use generated component wiring.
 
 | Step | Outcome |
 | --- | --- |
@@ -17,4 +19,4 @@ The component example executes generated constructor injection and lifecycle cal
 For actual generated queue, job and saga hosting, run the additional [integration verification](../testing/verified-examples.md). Each example states what it proves so a short tutorial does not become an unsupported production guarantee.
 
 !!! important "Separate JVMs and separate hosts"
-    The built-in gRPC and RMI providers currently advertise loopback endpoints. The first multi-JVM exercise therefore runs on one host. Multicast/network-bootstrap registry discovery and native resource servers have separate network configuration. Cross-host business invocation needs an appropriate host transport integration; there is no undocumented built-in advertised-host setting to copy.
+    The default gRPC and RMI configurations advertise loopback endpoints, so the first multi-JVM exercise runs on one host. gRPC also supports explicit bind and advertised endpoints; see [transport configuration](../configuration/transports.md). Multicast/bootstrap registry discovery and native resource servers have separate configuration and do not change invocation endpoints. RMI has no equivalent public bind/advertise configuration.

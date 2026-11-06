@@ -51,9 +51,8 @@ import org.junit.jupiter.api.Test;
 final class IsolationNoContainerRuntimeClaimTest {
     @Test
     void docsAndBuildAvoidContainerRuntimeClaimsAndDependencies() throws Exception {
-        final String docs = Files.exists(Path.of("../docs/internal/06000 - Security Reviews/isolation-provider.md"))
-                ? Files.readString(Path.of("../docs/internal/06000 - Security Reviews/isolation-provider.md")).toLowerCase(java.util.Locale.ROOT)
-                : "";
+        final String docs = Files.readString(Path.of("../documentation/docs/security/isolation-providers.md"))
+                .toLowerCase(java.util.Locale.ROOT);
         final String rootBuild = Files.readString(Path.of("../build.gradle")).toLowerCase(java.util.Locale.ROOT);
         for (String line : rootBuild.lines().toList()) {
             String trimmed = line.trim();
@@ -64,11 +63,8 @@ final class IsolationNoContainerRuntimeClaimTest {
                 assertFalse(trimmed.contains("org.testcontainers"), line);
             }
         }
-        if (!docs.isEmpty()) {
-            assertTrue(docs.contains("not docker"));
-            assertTrue(docs.contains("not kubernetes"));
-            assertTrue(docs.contains("not a full container runtime"));
-            assertTrue(docs.contains("advisory"));
-        }
+        assertTrue(docs.contains("not an os filesystem jail, network firewall, container runtime or cpu/memory controller"));
+        assertTrue(docs.contains("cannot intercept arbitrary java i/o"));
+        assertTrue(docs.contains("advisory"));
     }
 }

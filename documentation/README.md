@@ -1,10 +1,7 @@
 # J7M documentation
 
 This directory contains the English developer and operator manual, its MkDocs
-Material theme, and executable documentation examples. It is maintained by the
-J7M project maintainers. Content review date: 25 October 2026. Review the affected
-pages whenever their public API, defaults, security policy or failure contract
-changes. Historical development notes are sources, not the public manual.
+Material theme, and executable documentation examples.
 
 ## Build and preview
 

@@ -52,9 +52,7 @@ import org.junit.jupiter.api.Test;
 public final class MessagingDocumentationConsistencyTest {
     @Test
     public void durableQueueDocumentationNamesCurrentSchemaAndEvents() throws IOException {
-        String durableQueue = Files.readString(repositoryRoot().resolve("docs/internal/01000 - Normative Specifications/durable-queue.md"), StandardCharsets.UTF_8);
-        String outboxInbox = Files.readString(repositoryRoot().resolve("docs/internal/01000 - Normative Specifications/outbox-inbox.md"), StandardCharsets.UTF_8);
-        String combined = durableQueue + "\n" + outboxInbox;
+        String combined = Files.readString(repositoryRoot().resolve("documentation/docs/reference/local-messaging-storage.md"), StandardCharsets.UTF_8);
 
         assertTrue(combined.contains("schema `version=" + QueueEventCodec.SCHEMA_VERSION + "`"));
         assertTrue(combined.contains("CHECKPOINT"));
@@ -67,7 +65,7 @@ public final class MessagingDocumentationConsistencyTest {
         Path current = Path.of("").toAbsolutePath();
         for (int depth = 0; depth < 6; depth++) {
             if (Files.isRegularFile(current.resolve("settings.gradle"))
-                    && Files.isDirectory(current.resolve("docs"))) {
+                    && Files.isDirectory(current.resolve("documentation/docs"))) {
                 return current;
             }
             Path parent = current.getParent();

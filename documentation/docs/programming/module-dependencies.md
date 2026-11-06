@@ -27,7 +27,7 @@ The table lists direct J7M module requirements from the current `module-info.jav
 | `j7m-adapter-spi` | `org.j7m.adapter.spi` | api |
 | `j7m-adapter-tck` | `org.j7m.adapter.tck` | api, adapter.spi |
 | `j7m-annotation-processor` | `org.j7m.annotation.processor` | api |
-| `j7m-deployer-cli` | `org.j7m.deployer.cli` | api, application.platform |
+| `j7m-deployer-cli` | `org.j7m.deployer.cli` | api, application.platform, runtime, transport.grpc, transport.rmi |
 | `j7m-testkit` | `org.j7m.testkit` | api |
 | `j7m-examples` | `org.j7m.examples` | api |
 

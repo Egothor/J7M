@@ -182,12 +182,31 @@ public final class J7mApplicationPlugin implements Plugin<Project> {
 
     private void signBundle(final J7mApplicationExtension extension) {
         ApplicationBundle bundle = this.bundle(extension);
-        new DefaultBundleSigner().sign(bundle);
+        if (extension.getSigningPrivateKey().isPresent() != extension.getSigningPublicKey().isPresent()) {
+            throw new GradleException("Both publisher key files must be configured");
+        }
+        if (extension.getSigningPrivateKey().isPresent()) {
+            try {
+                var keyFactory = java.security.KeyFactory.getInstance("Ed25519");
+                var privateKey = keyFactory.generatePrivate(new java.security.spec.PKCS8EncodedKeySpec(
+                        Files.readAllBytes(extension.getSigningPrivateKey().get().getAsFile().toPath())));
+                var publicKey = keyFactory.generatePublic(new java.security.spec.X509EncodedKeySpec(
+                        Files.readAllBytes(extension.getSigningPublicKey().get().getAsFile().toPath())));
+                var pair = new org.j7m.middleware.application.repository.SigningKeyPair(
+                        new org.j7m.middleware.application.repository.SigningKeyId(extension.getSigningKeyId().get()),
+                        extension.getSigningKeyId().get(), privateKey, publicKey);
+                new DefaultBundleSigner(pair, java.time.Clock.systemUTC()).sign(bundle);
+            } catch (java.io.IOException | java.security.GeneralSecurityException failure) {
+                throw new GradleException("Publisher signing key rejected");
+            }
+        } else {
+            new DefaultBundleSigner().sign(bundle);
+        }
         System.out.println("j7mSign signed " + bundle.path().getFileName());
     }
 
     private void verifyBundle(final J7mApplicationExtension extension) {
-        ApplicationVerificationResult result = new ApplicationBundleVerifier().verify(this.bundle(extension), this.policy(extension));
+        ApplicationVerificationResult result = new ApplicationBundleVerifier(this.signingTrust(extension), org.j7m.middleware.application.repository.ApplicationPlatformLimits.defaults()).verify(this.bundle(extension), this.policy(extension));
         if (!result.accepted()) {
             throw new GradleException("J7M verification rejected bundle");
         }
@@ -237,7 +256,23 @@ public final class J7mApplicationPlugin implements Plugin<Project> {
     }
 
     private LocalApplicationRepository repository(final J7mApplicationExtension extension) {
-        return new LocalApplicationRepository(extension.getRepositoryDir().get().getAsFile().toPath());
+        return new LocalApplicationRepository(extension.getRepositoryDir().get().getAsFile().toPath(),
+                java.time.Clock.systemUTC(), org.j7m.middleware.application.repository.ApplicationPlatformLimits.defaults(),
+                this.signingTrust(extension));
+    }
+
+    private org.j7m.middleware.application.repository.PublicKeyTrustStore signingTrust(final J7mApplicationExtension extension) {
+        if (!extension.getSigningPublicKey().isPresent()) {
+            return org.j7m.middleware.application.repository.PublicKeyTrustStore.localDevelopment();
+        }
+        try {
+            var key = java.security.KeyFactory.getInstance("Ed25519").generatePublic(new java.security.spec.X509EncodedKeySpec(
+                    Files.readAllBytes(extension.getSigningPublicKey().get().getAsFile().toPath())));
+            return new org.j7m.middleware.application.repository.PublicKeyTrustStore(java.util.Map.of(
+                    new org.j7m.middleware.application.repository.SigningKeyId(extension.getSigningKeyId().get()), key));
+        } catch (java.io.IOException | java.security.GeneralSecurityException failure) {
+            throw new GradleException("Publisher verification key rejected");
+        }
     }
 
     private ApplicationBundle bundle(final J7mApplicationExtension extension) {

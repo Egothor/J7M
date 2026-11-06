@@ -45,6 +45,9 @@
 module org.j7m.deployer.cli {
     requires org.j7m.api;
     requires org.j7m.application.platform;
+    requires org.j7m.runtime;
+    requires org.j7m.transport.grpc;
+    requires org.j7m.transport.rmi;
 
     exports org.j7m.middleware.deployer.cli;
 

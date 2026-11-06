@@ -1,0 +1,8 @@
+{
+  "schemaVersion": "j7m.application/v1",
+  "application": {"group": "example", "name": "hello", "version": "1.0.0", "displayName": "Hello J7M", "description": "Standalone annotation-processed application"},
+  "runtime": {"minJ7mVersion": "0.9.9", "javaVersion": "25", "moduleMode": "CLASSPATH", "bootstrapClass": "example.hello.HelloApplication"},
+  "services": [],
+  "security": {"trustDomain": "default", "confidential": false},
+  "resources": {"cpu": "1", "memory": "128MiB", "maxConcurrentInvocations": 8, "maxInboundPayload": "1MiB"}
+}

@@ -52,9 +52,7 @@ final class SagaNoDistributedTransactionClaimTest {
     @Test
     void docsAndApiDoNotClaimDistributedAcidOrExactlyOnce() throws Exception {
         Path root = SagaTestSupport.repositoryRoot();
-        String docs = Files.exists(root.resolve("docs/internal/01000 - Normative Specifications/saga.md"))
-                ? Files.readString(root.resolve("docs/internal/01000 - Normative Specifications/saga.md"))
-                : "";
+        String docs = Files.readString(root.resolve("documentation/docs/patterns/sagas.md"));
         String api = String.join("\n", Files.walk(root.resolve("j7m-api/src/main/java/org/j7m/middleware/api/saga"))
                 .filter(Files::isRegularFile)
                 .map(SagaNoDistributedTransactionClaimTest::read)
@@ -65,7 +63,7 @@ final class SagaNoDistributedTransactionClaimTest {
         assertFalse(normalizedApi.contains("implements xa"));
         assertFalse(normalizedApi.contains("two-phase commit coordinator"));
         assertFalse(normalizedApi.contains("guarantees generic exactly-once"));
-        assertTrue(docs.isBlank() || docs.contains("not an ACID transaction"));
+        assertTrue(docs.contains("not an ACID transaction"));
     }
 
     private static String read(final Path path) {

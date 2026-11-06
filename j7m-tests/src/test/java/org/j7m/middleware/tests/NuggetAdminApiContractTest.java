@@ -1148,24 +1148,24 @@ public final class NuggetAdminApiContractTest {
 
     @org.junit.jupiter.api.Test
     void normativeDocumentationSchemaAndResourceMapArePresent() throws IOException {
-        String contract = read("docs/internal/01000 - Normative Specifications/nugget-admin-api-contract.md");
-        String json = read("docs/internal/01000 - Normative Specifications/nugget-admin-json.md");
-        String schema = read("docs/schema/nugget-admin-contract.schema.json");
-        String resourceMap = read("docs/internal/03000 - Architecture Decisions/nugget-web-api-resource-map.md");
+        String contract = read("documentation/docs/reference/admin-api.md");
+        String json = read("documentation/docs/reference/admin-json.md");
+        String schema = read("documentation/docs/reference/schemas/nugget-admin-contract.schema.json");
+        String resourceMap = read("documentation/docs/reference/admin-json.md");
 
-        assertTrue(contract.contains("j7m-nugget-admin-json"));
-        assertTrue(contract.contains("unsupported request protocol version"));
-        assertTrue(json.contains("Unknown fields"));
+        assertTrue(json.contains("j7m-nugget-admin-json"));
+        assertTrue(contract.contains("Unsupported protocol versions fail during context construction"));
+        assertTrue(json.contains("Extra properties and unsupported variants are rejected"));
         assertTrue(schema.contains("\"formatName\""));
         assertTrue(schema.contains("\"operationKind\""));
-        assertTrue(resourceMap.contains("/nuggets/{id}/objects/{objectId}"));
-        assertTrue(resourceMap.contains("/nuggets/{id}/kill"));
-        assertTrue(resourceMap.contains("No listener, route, cookie, browser session, OAuth"));
+        assertTrue(resourceMap.contains("does not infer an HTTP route, listener, authentication header, browser session"));
+        assertTrue(contract.contains("It starts no listener and grants no authorization"));
+        assertTrue(resourceMap.contains("same admission, authorization, target generation and deadline rules"));
     }
 
     @org.junit.jupiter.api.Test
     void schemaParsesIsClosedAndSynchronizesWithJavaBinding() throws IOException {
-        String schema = read("docs/schema/nugget-admin-contract.schema.json");
+        String schema = read("documentation/docs/reference/schemas/nugget-admin-contract.schema.json");
         Object parsed = JsonParser.parse(schema);
         assertTrue(parsed instanceof Map<?, ?>);
         assertTrue(schema.contains("\"additionalProperties\": false"));
@@ -3049,7 +3049,7 @@ public final class NuggetAdminApiContractTest {
     }
 
     private static JsonSchemaValidator schemaValidator() throws IOException {
-        Object schema = JsonParser.parse(read("docs/schema/nugget-admin-contract.schema.json"));
+        Object schema = JsonParser.parse(read("documentation/docs/reference/schemas/nugget-admin-contract.schema.json"));
         if (!(schema instanceof Map<?, ?> schemaMap)) {
             throw new IllegalArgumentException("schema root must be an object");
         }
@@ -3197,7 +3197,7 @@ public final class NuggetAdminApiContractTest {
         Path current = Path.of("").toAbsolutePath().normalize();
         while (current != null) {
             if (Files.isRegularFile(current.resolve("README.md"))
-                    && Files.isDirectory(current.resolve("docs"))) {
+                    && Files.isDirectory(current.resolve("documentation/docs"))) {
                 return current;
             }
             current = current.getParent();

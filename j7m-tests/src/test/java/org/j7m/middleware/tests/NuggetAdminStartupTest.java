@@ -381,7 +381,14 @@ public final class NuggetAdminStartupTest {
         if (!Files.exists(descriptorPath)) {
             descriptorPath = Path.of("j7m-runtime/src/main/java/module-info.java");
         }
-        String descriptor = Files.readString(descriptorPath);
+        String source = Files.readString(descriptorPath)
+                .replaceAll("(?s)/\\*.*?\\*/", "")
+                .replaceAll("(?m)//.*$", "");
+        // License text such as "Website" is not a module dependency.
+        var directives = java.util.regex.Pattern.compile("\\b(?:exports|requires)\\s+[^;]+;").matcher(source);
+        StringBuilder declarations = new StringBuilder();
+        while (directives.find()) declarations.append(directives.group()).append('\n');
+        String descriptor = declarations.toString().replaceAll("\\s+", " ");
 
         assertFalse(descriptor.contains("exports org.j7m.middleware.operations.runtime"));
         assertFalse(descriptor.contains("j7m.transport.grpc"));

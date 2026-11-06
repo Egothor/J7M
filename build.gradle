@@ -26,3 +26,4 @@ apply from: "gradle/build-logic/root/60-sovereign-acceptance-report.gradle"
 apply from: "gradle/build-logic/root/70-documentation-platform.gradle"
 
 apply from: "gradle/build-logic/root/80-maven-central.gradle"
+apply from: "gradle/build-logic/root/90-release-distributions.gradle"

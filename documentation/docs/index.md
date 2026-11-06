@@ -17,23 +17,12 @@ Build distributed services, durable workers and recoverable workflows. Use
 annotated components or explicit APIs, with clear contracts for ownership,
 security and failure.
 
-[Get started →](getting-started/first-application.md){ .md-button .md-button--primary }
-[Explore all 80 annotations](annotations/index.md){ .md-button }
+[Develop an application →](getting-started/developer-project.md){ .md-button .md-button--primary }
+[Install the platform](deployment/installed-platform.md){ .md-button }
 
 <div class="j7m-home-foundation">Built on j5m. A foundation for the next generation of distributed applications.</div>
 </div>
 <span class="j7m-home-art-label">Concept illustration</span>
-</section>
-
-<section class="j7m-home-wayfinding" markdown>
-## Find your way through J7M
-
-[Follow the examples →](testing/verified-examples.md)
-[Choose a pattern →](patterns/index.md)
-[Configure discovery →](configuration/discovery.md)
-[Deploy and operate →](deployment/index.md)
-[Java API reference →](https://www.egothor.org/J7M/javadoc/)
-[Source code on GitHub →](https://github.com/Egothor/J7M)
 </section>
 
 <div class="j7m-home-capabilities" markdown>

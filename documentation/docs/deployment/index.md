@@ -1,6 +1,8 @@
 # Deployment Guide
 
-A J7M deployment has at least a host process and its application artifacts. Network discovery, invocation transports, artifact distribution and durable resource groups can run in separate processes. Select those boundaries from the application's availability and operational needs, rather than assuming every concern belongs in one JVM.
+A J7M deployment has at least a host process and its application artifacts. To install the supplied host and run an application bundle, follow [the platform installation procedure](installed-platform.md). Developers can build a compatible bundle with [the standalone Gradle project](../getting-started/developer-project.md).
+
+Network discovery, invocation transports, artifact distribution and durable resource groups can run in separate processes. Select those boundaries from the application's availability and operational needs, rather than assuming every concern belongs in one JVM.
 
 <figure class="j7m-diagram" markdown>
 <div class="j7m-diagram-scroll" tabindex="0" role="region" aria-label="Runtime and application topology" markdown>

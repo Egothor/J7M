@@ -66,6 +66,7 @@ class NetworkConsensusNodeIT {
         try (Cluster cluster = new Cluster(directory, 3)) {
             String initialLeader = cluster.leader();
             var client = cluster.appendClient(initialLeader);
+            long loadStarted = System.nanoTime();
             List<CompletableFuture<History>> requests = new ArrayList<>();
             for (int i = 0; i < 10_000; i++) {
                 String id = "op" + i; long invoked = System.nanoTime();
@@ -74,6 +75,7 @@ class NetworkConsensusNodeIT {
             }
             Set<Long> positions = new HashSet<>(); List<History> history = new ArrayList<>();
             for (var request : requests) { History operation = request.get(60, TimeUnit.SECONDS); assertTrue(positions.add(operation.index())); history.add(operation); }
+            cluster.loadProgress(10_000, loadStarted);
             verifyAndRetainHistory(history);
             assertEquals(10_000, positions.size());
             String leader = cluster.leader();
@@ -101,9 +103,9 @@ class NetworkConsensusNodeIT {
         }
     }
 
-    @Test void removingCurrentLeaderCanCommitBeforeItsConfigurationReply() throws Exception { removeCurrentLeader(false); }
+    @Test void removingCurrentLeaderCanCommitBeforeItsConfigurationReply() throws Exception { assertDoesNotThrow(() -> removeCurrentLeader(false)); }
 
-    @Test void leaderRemovalWaitsForLearnerAcknowledgementsAfterApplicationIsAlreadyVisible() throws Exception { removeCurrentLeader(true); }
+    @Test void leaderRemovalWaitsForLearnerAcknowledgementsAfterApplicationIsAlreadyVisible() throws Exception { assertDoesNotThrow(() -> removeCurrentLeader(true)); }
 
     private void removeCurrentLeader(boolean delayLearnerReplies) throws Exception {
         try (Cluster cluster = new Cluster(directory, 3)) {
@@ -222,10 +224,12 @@ class NetworkConsensusNodeIT {
             String initialLeader = cluster.leader(); String offline = List.of("a", "b", "c").stream().filter(id -> !id.equals(initialLeader)).findFirst().orElseThrow();
             cluster.kill(offline);
             var client = cluster.appendClient(initialLeader);
+            long loadStarted = System.nanoTime();
             for (int offset = 0; offset < 100_000; offset += 1000) {
                 List<CompletableFuture<String>> batch = new ArrayList<>();
                 for (int i = offset; i < offset + 1000; i++) batch.add(client.append("load" + i, 1, Duration.ofSeconds(60)));
                 for (var operation : batch) operation.get(60, TimeUnit.SECONDS);
+                if ((offset + 1000) % 10_000 == 0) cluster.loadProgress(offset + 1000, loadStarted);
             }
             String leader = cluster.leader();
             cluster.call(leader, "READ"); String before = cluster.call(leader, "STATE");
@@ -317,6 +321,8 @@ class NetworkConsensusNodeIT {
         final Map<String, Integer> ports = new HashMap<>();
         final Map<String, Proxy> proxies = new HashMap<>();
         final Set<String> isolated = ConcurrentHashMap.newKeySet();
+        final AtomicLong routingDiscoveries = new AtomicLong();
+        final AtomicLong appendAttempts = new AtomicLong();
         Cluster(Path directory, int count) throws Exception {
             this.directory = directory;
             try {
@@ -338,26 +344,33 @@ class NetworkConsensusNodeIT {
         void heal() { isolated.clear(); }
         ConsensusAppendClient appendClient(String initialLeader) {
             return new ConsensusAppendClient(initialLeader,
-                    (node, command) -> nodes.get(node).ask(command), this::retryLeader);
+                    (node, command) -> { appendAttempts.incrementAndGet(); return nodes.get(node).ask(command); }, this::retryLeader);
         }
-        private synchronized String retryLeader(String previous, long deadline) throws Exception {
-            while (System.nanoTime() < deadline) {
+        void loadProgress(long commands, long started) {
+            System.out.printf(Locale.ROOT, "Consensus load commands=%d attempts=%d discoveries=%d elapsedMillis=%d%n",
+                    commands, appendAttempts.get(), routingDiscoveries.get(), TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started));
+        }
+        private synchronized String retryLeader(String previous, java.util.function.LongSupplier deadline) throws Exception {
+            routingDiscoveries.incrementAndGet();
+            while (System.nanoTime() < deadline.getAsLong()) {
                 for (String id : nodes.keySet()) if (!isolated.contains(id)) {
-                    long remaining = deadline - System.nanoTime();
-                    if (remaining <= 0) throw new TimeoutException("leader routing deadline after " + previous);
                     try {
+                        long remaining = deadline.getAsLong() - System.nanoTime();
+                        if (remaining <= 0) throw new TimeoutException("leader routing deadline after " + previous);
                         String status = nodes.get(id).ask("STATUS").get(remaining, TimeUnit.NANOSECONDS);
                         if (status.split(",", -1)[0].equals(id)) {
-                            remaining = deadline - System.nanoTime();
+                            remaining = deadline.getAsLong() - System.nanoTime();
                             if (remaining <= 0) throw new TimeoutException("leader routing deadline after " + previous);
                             nodes.get(id).ask("READ").get(remaining, TimeUnit.NANOSECONDS);
                             return id;
                         }
                     } catch (ExecutionException transientStatus) {
                         if (!(transientStatus.getCause() instanceof IOException)) throw transientStatus;
+                    } catch (TimeoutException expiredRpc) {
+                        if (System.nanoTime() >= deadline.getAsLong()) throw expiredRpc;
                     }
                 }
-                LockSupport.parkNanos(Math.min(5_000_000, Math.max(0, deadline - System.nanoTime())));
+                LockSupport.parkNanos(Math.min(5_000_000, Math.max(0, deadline.getAsLong() - System.nanoTime())));
                 if (Thread.interrupted()) throw new InterruptedException("leader routing interrupted");
             }
             throw new TimeoutException("leader routing deadline after " + previous);

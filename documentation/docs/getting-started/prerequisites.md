@@ -1,6 +1,8 @@
 # Requirements and development environment
 
-Use a full **JDK 25**, including `javac` and `keytool`, rather than a runtime-only image. The project supplies its Gradle wrapper and pins its build distribution. Documentation verification also uses Python 3.9 or newer.
+Application developers need a full **JDK 25**, including `javac` and `keytool`, and Gradle. The [standalone project guide](developer-project.md) shows the complete Maven dependency and annotation-processor configuration. A source checkout is required only to build J7M itself or run its repository examples; that checkout supplies the pinned Gradle wrapper. Documentation verification also uses Python 3.9 or newer.
+
+Application operators use the [platform distribution](../deployment/installed-platform.md). Its launcher needs Java 25; running a supplied application bundle does not require Gradle, Python or the J7M source tree.
 
 From a source checkout, start in the repository root:
 
@@ -22,6 +24,6 @@ The development qualification described by the project uses Linux, Java 25 and t
 
 ## Choose a safe initial scope
 
-Begin on one host. The built-in gRPC/RMI provider implementation advertises `127.0.0.1` with allocated ports. Registry discovery across machines does not change those business endpoints. See [deployment topologies](../deployment/topologies.md) before moving the application to multiple machines.
+Begin on one host. The default gRPC/RMI configurations advertise `127.0.0.1` with allocated ports. gRPC can use explicit bind and advertised endpoints through its [network configuration](../configuration/transports.md); RMI remains loopback-only. Registry discovery across machines does not change those business endpoints. See [deployment topologies](../deployment/topologies.md) before moving the application to multiple machines.
 
 Proceed to [building the examples](build.md).

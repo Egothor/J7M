@@ -99,13 +99,13 @@ final class AnnotationFirstExampleTest {
         String source = exampleSource(root)
                 .replaceAll("(?s)/\\*.*?\\*/", "")
                 .replaceAll("(?m)//.*$", "");
-        String matrix = Files.readString(root.resolve("docs/internal/01000 - Normative Specifications/annotation-coverage.md"), StandardCharsets.UTF_8);
+        String matrix = Files.readString(root.resolve("documentation/docs/annotations/index.md"), StandardCharsets.UTF_8);
 
         assertTrue(annotations.size() >= 55, "public annotation inventory unexpectedly shrank");
         for (String annotation : annotations) {
             assertTrue(source.matches("(?s).*(^|[\\s(,])@" + java.util.regex.Pattern.quote(annotation) + "\\b.*"),
                     "missing concrete example usage for @" + annotation);
-            assertTrue(matrix.contains("| @" + annotation + " |"), "missing matrix row for @" + annotation);
+            assertTrue(matrix.contains("| [@" + annotation + "]("), "missing public annotation reference for @" + annotation);
         }
         assertFalse(matrix.contains("| BLOCKED |"));
         assertFalse(matrix.contains("ACCEPT_WITH_LIMITATIONS"));

@@ -1,0 +1,75 @@
+// Copyright (c) 2026, Leo Galambos and the Egothor team
+// SPDX-License-Identifier: BSD-4-Clause
+/*
+ * Purpose: assembles downloadable developer and operator release distributions.
+ * Owns: starter archive, release checksums and the external consumer qualification.
+ * Must not own: runtime lifecycle, application trust, module dependencies or publication metadata.
+ * Root rationale: assets combine the wrapper, external starter and platform distribution.
+ * Related validation tasks: validateConsumerDistribution, releaseChecksums.
+ */
+def starter = tasks.register("starterZip", Zip) {
+    archiveBaseName = "j7m-starter"
+    destinationDirectory = layout.buildDirectory.dir("distributions")
+    into("j7m-starter-${project.version}") {
+        from("examples/standalone-application") {
+            include "build.gradle", "settings.gradle", "gradle.properties", ".gitignore", "README.md", "OPERATOR.md", "META-INF/**", "conf/**", "src/**"
+            filesMatching("gradle.properties") { filter { line -> line.startsWith("j7mVersion=") ? "j7mVersion=${project.version}" : line } }
+        }
+        from(".") {
+            include "gradlew", "gradlew.bat", "gradle/wrapper/**", "LICENSE"
+            filesMatching("gradlew") { permissions { unix("rwxr-xr-x") } }
+        }
+    }
+}
+
+def archiveTaskNames = ["platformDistZip", "platformDistTar", "distZip", "distTar"]
+def archiveTasks = [starter] + archiveTaskNames.collect { ":j7m-deployer-cli:${it}" }
+def releaseArchives = files(starter.flatMap { it.archiveFile }, archiveTaskNames.collect { name ->
+    providers.provider { project(":j7m-deployer-cli").tasks.named(name).get().archiveFile.get().asFile }
+})
+tasks.register("releaseChecksums") {
+    group = "distribution"
+    description = "Hashes downloadable developer and operator archives."
+    dependsOn archiveTasks, "validateConsumerDistribution"
+    def archives = files(releaseArchives, layout.buildDirectory.file("distributions/j7m-hello-${project.version}.zip"))
+    inputs.files(archives)
+    def output = layout.buildDirectory.file("distributions/SHA256SUMS")
+    outputs.file(output)
+    doLast {
+        output.get().asFile.parentFile.mkdirs()
+        output.get().asFile.text = archives.files.sort { it.name }.collect { archive ->
+            def digest = java.security.MessageDigest.getInstance("SHA-256")
+            archive.withInputStream { input ->
+                byte[] block = new byte[65536]
+                int count
+                while ((count = input.read(block)) != -1) digest.update(block, 0, count)
+            }
+            "${digest.digest().encodeHex()}  ${archive.name}\n"
+        }.join("")
+    }
+}
+
+tasks.register("stageConsumerPublications") {
+    group = "verification"
+    description = "Stages unsigned Maven artifacts exclusively for external consumer qualification."
+    dependsOn rootProject.file("gradle/central-publications.txt").readLines("UTF-8")
+            .collect { it.trim() }.findAll { it.startsWith("j7m-") }
+            .collect { ":${it}:publishMavenJavaPublicationToConsumerValidationRepository" }
+}
+
+tasks.register("validateConsumerDistribution", Exec) {
+    group = "verification"
+    description = "Builds an external Maven consumer and runs an unpacked platform with signed application trust."
+    dependsOn "stageConsumerPublications", starter, ":j7m-deployer-cli:platformDistZip"
+    def gradleExecutable = new File(gradle.gradleHomeDir, "bin/gradle")
+    def exampleArchive = layout.buildDirectory.file("distributions/j7m-hello-${project.version}.zip")
+    outputs.file(exampleArchive)
+    outputs.upToDateWhen { false }
+    commandLine "python3", file("tools/validate_consumer_distribution.py"),
+            "--repository", layout.buildDirectory.dir("consumer-maven").get().asFile,
+            "--starter", starter.get().archiveFile.get().asFile,
+            "--platform", project(":j7m-deployer-cli").layout.buildDirectory.file("distributions/j7m-platform-${project.version}.zip").get().asFile,
+            "--gradle", gradleExecutable, "--version", project.version.toString(),
+            "--example-output", exampleArchive.get().asFile,
+            "--example-readme", file("examples/standalone-application/OPERATOR.md")
+}

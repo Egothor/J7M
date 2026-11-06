@@ -225,7 +225,7 @@ final class ApplicationPlatformVerticalSliceTest {
     }
 
     private Path exampleJar() {
-        Path jar = projectPath("j7m-examples/build/libs/j7m-examples-0.1.0-SNAPSHOT.jar");
+        Path jar = Path.of(System.getProperty("j7m.test.exampleJar"));
         assertDoesNotThrow(() -> Files.size(jar));
         return jar;
     }

@@ -2,6 +2,10 @@
 
 Keep executable code, declared metadata, mutable runtime state and secrets in separate ownership domains. A signed application bundle is an immutable release; a consensus directory is live state; a TLS private-key store is protected host configuration. They have different retention and access requirements.
 
+For an operator installation, use the [downloadable platform archive](installed-platform.md).
+It includes the executable host and its library dependencies. To produce an application
+bundle outside the J7M repository, use the [standalone Gradle project](../getting-started/developer-project.md).
+
 A deployable application declares `META-INF/j7m-application.json`. The CLI also recognizes the normal resources path `src/main/resources/META-INF/j7m-application.json`. The manifest identifies the application coordinate, Java/module requirements, bootstrap class and exported services.
 
 For JPMS mode, declare the bootstrap module and all module JAR paths explicitly. Module resolution and generated service-provider declarations replace indiscriminate reflective `opens`. The host validates package/module origins before loading application code.

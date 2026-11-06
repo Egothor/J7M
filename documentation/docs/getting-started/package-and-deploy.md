@@ -2,6 +2,11 @@
 
 A component example verifies application code. A managed deployment additionally needs a verified artifact, a manifest, a repository, trusted host capabilities and a controlled activation request.
 
+For the complete developer procedure, including external Maven coordinates,
+annotation processing, signing and packaging, follow [your Gradle project](developer-project.md).
+The operator then follows [install and run the platform](../deployment/installed-platform.md)
+to activate that bundle using the downloadable host.
+
 ## Prepare the application
 
 Keep public business interfaces separate from implementation details. Compile generated component/schema/host adapters with the real processor. For named modules, declare the required generated service providers and export public contracts; do not use blanket `opens` as a replacement for a valid generated contract.

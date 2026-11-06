@@ -1,6 +1,5 @@
 # Managed application canary traffic
 
-Owner: j7m maintainers. Updated: 2026-10-23. Review after a traffic-policy or lifecycle schema change.
 
 `CanaryDeployment` routes actual managed application requests through `ManagedInvocation` endpoints. `ClusterNodeClient` is the authenticated TCP implementation; its revision-pinned invocation enters the `ApplicationManagerHost` admission gate. The controller never substitutes a local arithmetic load generator for application invocation. The D-P17 process gates are pending final measurement and independent acceptance.
 

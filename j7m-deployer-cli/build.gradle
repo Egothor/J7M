@@ -16,6 +16,9 @@ application {
 dependencies {
     implementation project(":j7m-api")
     implementation project(":j7m-application-platform")
+    implementation project(":j7m-runtime")
+    implementation project(":j7m-transport-grpc")
+    implementation project(":j7m-transport-rmi")
     testImplementation libs.junit.jupiter
     testRuntimeOnly libs.junit.platform.launcher
 }
@@ -29,4 +32,33 @@ tasks.register("validateJ7mCliConsole", Test) {
     filter {
         includeTestsMatching "org.j7m.middleware.deployer.cli.J7mCliTest"
     }
+}
+
+// The installed host carries the same runtime feature set as the Maven release.
+rootProject.file("gradle/central-publications.txt").readLines("UTF-8")
+        .collect { it.trim() }.findAll { it.startsWith("j7m-") && !(it in ["j7m-deployer-cli", "j7m-gradle-plugin", "j7m-annotation-processor"]) }
+        .each { name -> dependencies.add("runtimeOnly", project(":${name}")) }
+
+def platformScripts = tasks.register("platformStartScripts", CreateStartScripts) {
+    mainClass = "org.j7m.middleware.deployer.cli.J7mPlatform"
+    applicationName = "j7m-platform"
+    outputDir = layout.buildDirectory.dir("platform-scripts").get().asFile
+    classpath = files(tasks.named("jar")) + configurations.runtimeClasspath
+    defaultJvmOpts = ["--enable-native-access=ALL-UNNAMED", "--sun-misc-unsafe-memory-access=allow"]
+}
+distributions {
+    platform {
+        distributionBaseName = "j7m-platform"
+        contents {
+            from(platformScripts) { into "bin"; filePermissions { unix("rwxr-xr-x") } }
+            from(tasks.named("jar")) { into "lib" }
+            from(configurations.runtimeClasspath) { into "lib" }
+            from("src/platform")
+            from(rootProject.file("LICENSE"))
+        }
+    }
+}
+tasks.named("platformDistTar", Tar) {
+    compression = Compression.GZIP
+    archiveExtension = "tar.gz"
 }

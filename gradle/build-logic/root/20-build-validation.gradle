@@ -127,6 +127,28 @@ tasks.register("validateBuildConventions") {
             throw new GradleException("convention plugins lack meaningful configuration or documented purpose: ${weakConventionPlugins}")
         }
 
+        // A released independent build cannot use this repository's buildSrc.
+        // Included projects remain governed even if they contain a settings file.
+        Closure<Boolean> independentBuildBoundary = { boolean ownsSettings, boolean includedProject ->
+            ownsSettings && !includedProject
+        }
+        Closure<List<String>> repeatedModuleConventions = { String text, boolean independentBuild ->
+            List<String> violations = []
+            if (!independentBuild) {
+                ["tasks.withType(JavaCompile)", "tasks.withType(Javadoc)", "tasks.withType(JavaExec)", "languageVersion = JavaLanguageVersion.of"].each { String marker ->
+                    if (text.contains(marker)) violations.add("repeated standard boilerplate ${marker}")
+                }
+                // Typed Test hooks may own module-specific fixture inputs. Detect
+                // duplicated framework/JVM policy rather than the typed hook itself.
+                if (java.util.regex.Pattern.compile("\\buseJUnitPlatform\\s*\\(").matcher(text).find()) {
+                    violations.add("repeated standard Test framework policy")
+                }
+                if (java.util.regex.Pattern.compile("(?m)\\b(?:jvmArgs|setJvmArgs)\\b[^\\n]*(?:--enable-native-access|--sun-misc-unsafe-memory-access)").matcher(text).find()) {
+                    violations.add("repeated standard Test JVM policy")
+                }
+            }
+            violations
+        }
         List<String> moduleBuildViolations = []
         fileTree(".").matching {
             include "j7m-*/build.gradle"
@@ -135,13 +157,14 @@ tasks.register("validateBuildConventions") {
             exclude "build/**"
         }.files.each { File moduleBuild ->
             String text = moduleBuild.getText("UTF-8")
-            if (java.util.regex.Pattern.compile("\"(?:org\\.junit|org\\.junit\\.platform|io\\.grpc|com\\.google\\.protobuf):[^\"]+:[^\"]+\"").matcher(text).find()) {
+            boolean independentBuild = independentBuildBoundary(
+                    new File(moduleBuild.parentFile, "settings.gradle").isFile(),
+                    subprojects.any { it.projectDir.canonicalFile == moduleBuild.parentFile.canonicalFile })
+            if (!independentBuild && java.util.regex.Pattern.compile("\"(?:org\\.junit|org\\.junit\\.platform|io\\.grpc|com\\.google\\.protobuf):[^\"]+:[^\"]+\"").matcher(text).find()) {
                 moduleBuildViolations.add("${moduleBuild}:hardcoded dependency version")
             }
-            ["tasks.withType(JavaCompile)", "tasks.withType(Test)", "tasks.withType(Javadoc)", "tasks.withType(JavaExec)", "languageVersion = JavaLanguageVersion.of"].each { String marker ->
-                if (text.contains(marker)) {
-                    moduleBuildViolations.add("${moduleBuild}:repeated standard boilerplate ${marker}")
-                }
+            repeatedModuleConventions(text, independentBuild).each { String violation ->
+                moduleBuildViolations.add("${moduleBuild}:${violation}")
             }
         }
         if (!moduleBuildViolations.isEmpty()) {
@@ -155,6 +178,30 @@ tasks.register("validateBuildConventions") {
                 return
             }
             throw new GradleException("synthetic invalid build convention passed validation: ${name}")
+        }
+        String fixtureHook = 'tasks.withType(Test).configureEach { inputs.file(exampleJar); doFirst { systemProperty "j7m.test.exampleJar", exampleJar } }'
+        if (!repeatedModuleConventions(fixtureHook, false).isEmpty()) {
+            throw new GradleException("module-owned Test artifact fixtures were rejected")
+        }
+        String standalonePolicy = 'java { toolchain { languageVersion = JavaLanguageVersion.of(25) } }; tasks.withType(Test).configureEach { useJUnitPlatform() }'
+        if (!independentBuildBoundary(true, false) || independentBuildBoundary(true, true)
+                || independentBuildBoundary(false, false) || !repeatedModuleConventions(standalonePolicy, true).isEmpty()) {
+            throw new GradleException("independent build boundary was misclassified")
+        }
+        expectBuildConventionFailure("duplicated-test-framework-policy") {
+            if (!repeatedModuleConventions('tasks.withType(Test).configureEach { useJUnitPlatform() }', false).isEmpty()) {
+                throw new GradleException("duplicated Test framework policy rejected")
+            }
+        }
+        expectBuildConventionFailure("duplicated-test-jvm-policy") {
+            if (!repeatedModuleConventions('tasks.withType(Test).configureEach { jvmArgs "--enable-native-access=ALL-UNNAMED" }', false).isEmpty()) {
+                throw new GradleException("duplicated Test JVM policy rejected")
+            }
+        }
+        expectBuildConventionFailure("included-project-own-settings-not-exempt") {
+            if (!repeatedModuleConventions(standalonePolicy, independentBuildBoundary(true, true)).isEmpty()) {
+                throw new GradleException("included project remains governed")
+            }
         }
         String oversizedRoot = (1..(rootBuildNonCommentLimit + 1)).collect { "tasks.register(\"x${it}\") { }" }.join("\n")
         expectBuildConventionFailure("oversized-root") { validateRootText(oversizedRoot) }

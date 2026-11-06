@@ -73,9 +73,16 @@ public final class JobFrontendProcess {
         var trust=new PublicKeyTrustStore(Map.of(new SigningKeyId("operator"),key));
         var addresses=Arrays.stream(args[3].split(",")).map(value->new InetSocketAddress("127.0.0.1",Integer.parseInt(value))).toList();
         var nativeEndpoint=new PartitionClient(addresses,"app",new byte[32]);
-        var held=new AtomicBoolean();PartitionEndpoint endpoint=new PartitionEndpoint(){
+        var held=new AtomicBoolean();var lostProgressReply=new AtomicBoolean();
+        var checkpointWrites=new java.util.concurrent.atomic.AtomicInteger();
+        PartitionEndpoint endpoint=new PartitionEndpoint(){
             public PartitionReply execute(long epoch,String request,byte[] command,byte[] query,Instant deadline)throws IOException{
                 var reply=nativeEndpoint.execute(epoch,request,command,query,deadline);
+                // Lose a committed progress reply before the initial application exchange.
+                if(args[7].equals("parallel-progress-reply-loss")&&ResourceCommand.decode(command).operation().equals("J_CHECKPOINT")
+                        &&reply.status().equals("OK")&&ExecutionResult.decode(reply.payload()).status().equals("RUNNING")&&checkpointWrites.incrementAndGet()==2){
+                    lostProgressReply.set(true);throw new IOException("Injected committed progress reply loss");
+                }
                 if(args[7].equals("after-complete")&&ResourceCommand.decode(command).operation().equals("J_COMPLETE")&&held.compareAndSet(false,true)){
                     System.out.println("HOLD COMPLETE");System.out.flush();try{new CountDownLatch(1).await();}catch(InterruptedException interrupted){Thread.currentThread().interrupt();throw new IOException(interrupted);}
                 }
@@ -87,7 +94,7 @@ public final class JobFrontendProcess {
         };
         var schemas=new org.j7m.middleware.codec.api.SchemaRegistry(List.of());
         var profile=new ManagedJobProfile(ManagedExecutionBackend.group("execution","tenant",endpoint),new ManagedPayloadCodec(new org.j7m.middleware.codec.defaultcodec.DefaultValueCodec(schemas),schemas),"jobs.tenant",
-                Duration.ofSeconds(5),Duration.ofMillis(300),Duration.ofMillis(200),Duration.ofSeconds(4),Duration.ofMillis(20),!args[7].equals("parallel"));
+                Duration.ofSeconds(5),Duration.ofMillis(300),Duration.ofMillis(200),Duration.ofSeconds(4),Duration.ofMillis(20),!args[7].startsWith("parallel"));
         var paused=new AtomicBoolean(Boolean.parseBoolean(args[6]));
         try(var runtime=new MiddlewareRuntimeBuilder().runtimeId("jobs-"+work.getFileName()).addTransport(new GrpcTransportProvider()).disableNuggetAdmin().build();var factory=new ManagedJobFactory(Map.of("default",profile),2,8)){
             var repository=new LocalApplicationRepository(work.resolve("repository"),Clock.systemUTC(),ApplicationPlatformLimits.defaults(),trust);var coordinate=ApplicationCoordinate.parse("fixture:jobs:1");
@@ -118,6 +125,9 @@ public final class JobFrontendProcess {
                         case "START"->{try(var trace=InvocationTraceContext.open(Map.of("traceparent","00-0123456789abcdef0123456789abcdef-0123456789abcdef-01"))){System.out.println("START "+client.submit(id,"input",deadline).status());}}
                         case "RESUME"->{paused.set(false);System.out.println("RESUMED");}
                         case "STATUS"->{var state=client.status(id,deadline);System.out.println("STATUS "+state.status()+" "+state.fields().getOrDefault("fence","0"));}
+                        case "CLAIM"->{var state=client.status(id,deadline);System.out.println("CLAIM "+state.status()+" "+state.fields().getOrDefault("fence","0")+" "+state.fields().getOrDefault("owner","")+" "+!state.fields().getOrDefault("checkpoint","").isEmpty());}
+                        case "PROGRESS"->System.out.println("PROGRESS "+client.progress(id,String.class,deadline));
+                        case "FAULTS"->System.out.println("FAULTS "+(lostProgressReply.get()?1:0));
                         case "RESULT"->System.out.println("RESULT "+client.result(id,String.class,deadline));
                         case "READ"->{var value=client.readProtected("result."+id,deadline);System.out.println("READ "+(value==null?"absent":value.value()));}
                         case "STOP"->{var result=manager.deactivate(activation.instanceIdentity().instanceId());System.out.println("STOP "+result.success()+" "+result.state());System.out.flush();if(result.success())return;}
