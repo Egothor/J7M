@@ -156,6 +156,42 @@ class NetworkConsensusNodeTest {
         var restored = new NetworkConsensusNodeProcess.Counter();
         try (var node = new NetworkConsensusNode(config, restored)) { assertTrue(restored.text().startsWith("10,0,")); }
     }
+    @Test void singletonAcceptsMaintenanceAfterCachedQuorumConfirmationExpires() throws Exception {
+        var state = new NetworkConsensusNodeProcess.Counter();
+        try (var node = new NetworkConsensusNode(config(), state)) {
+            node.start(); awaitLeader(node);
+            var monitor = NetworkConsensusNode.class.getDeclaredField("mutex"); monitor.setAccessible(true);
+            var confirmation = NetworkConsensusNode.class.getDeclaredField("lastQuorumAt"); confirmation.setAccessible(true);
+            synchronized (monitor.get(node)) {
+                // Deterministically model a scheduler pause without relying on wall-clock sleeps.
+                confirmation.setLong(node, System.nanoTime() - Duration.ofSeconds(1).toNanos());
+                long index = node.appendControl(new byte[8], Instant.now().plusSeconds(3));
+                assertEquals("1,0," + index, state.text());
+            }
+        }
+    }
+    @Test void expiredConfirmationStillRejectsMultiVoterAndJointQuorumsBeforeAdmission() throws Exception {
+        try (var node = new NetworkConsensusNode(config(), new NetworkConsensusNodeProcess.Counter())) {
+            node.start(); awaitLeader(node);
+            var monitor = NetworkConsensusNode.class.getDeclaredField("mutex"); monitor.setAccessible(true);
+            var confirmation = NetworkConsensusNode.class.getDeclaredField("lastQuorumAt"); confirmation.setAccessible(true);
+            var members = NetworkConsensusNode.class.getDeclaredField("members"); members.setAccessible(true);
+            var joint = NetworkConsensusNode.class.getDeclaredField("joint"); joint.setAccessible(true);
+            synchronized (monitor.get(node)) {
+                long before = node.status().commitIndex();
+                for (boolean jointChange : List.of(false, true)) {
+                    members.set(node, jointChange ? Set.of("a") : Set.of("a", "b", "c"));
+                    joint.set(node, jointChange ? Set.of("a", "b", "c") : Set.of());
+                    confirmation.setLong(node, System.nanoTime() - Duration.ofSeconds(1).toNanos());
+                    IOException failure = assertThrows(IOException.class,
+                            () -> node.appendControl(new byte[8], Instant.now().plusSeconds(3)));
+                    assertEquals("UNAVAILABLE: quorum confirmation expired", failure.getMessage());
+                    assertEquals(before, node.status().commitIndex());
+                }
+                members.set(node, Set.of("a")); joint.set(node, Set.of());
+            }
+        }
+    }
     private static void awaitLeader(NetworkConsensusNode node) throws Exception {
         long deadline = System.nanoTime() + Duration.ofSeconds(5).toNanos();
         while (!node.status().leaderId().equals(node.status().nodeId())) {

@@ -51,6 +51,15 @@ jobs:
         env:
           RELEASE_VERSION: ${{ steps.version.outputs.version }}
         run: ./gradlew clean check javadoc :j7m-deployer-cli:distTar :j7m-deployer-cli:distZip --no-daemon -PreleaseVersion="$RELEASE_VERSION"
+      - name: Retain failed test diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: failed-test-diagnostics-${{ steps.version.outputs.version }}
+          path: |
+            **/build/test-results/test/**
+            **/build/reports/tests/test/**
+          if-no-files-found: ignore
       - name: Stage signed Maven publications
         env:
           RELEASE_VERSION: ${{ steps.version.outputs.version }}
@@ -64,20 +73,20 @@ jobs:
           name: central-bundle-${{ steps.version.outputs.version }}
           path: build/central-bundle.zip
           if-no-files-found: error
-      - name: Publish bundle to Maven Central
+      - name: Upload bundle for manual Maven Central publication
         env:
           CENTRAL_BEARER_TOKEN: ${{ secrets.CENTRAL_BEARER_TOKEN }}
         run: |
           deployment_id=$(curl --silent --show-error --fail-with-body \
             --request POST --header "Authorization: Bearer $CENTRAL_BEARER_TOKEN" \
             --form bundle=@build/central-bundle.zip \
-            'https://central.sonatype.com/api/v1/publisher/upload?publishingType=AUTOMATIC')
+            'https://central.sonatype.com/api/v1/publisher/upload?publishingType=USER_MANAGED')
           if [[ ! "$deployment_id" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]]; then
             echo 'Central did not return a deployment UUID' >&2
             exit 1
           fi
           echo "Central deployment: $deployment_id" >> "$GITHUB_STEP_SUMMARY"
-          echo 'Upload accepted. Maven Central validation and publication continue asynchronously; verify the deployment in the Central Portal.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Upload accepted for validation. After the deployment reaches VALIDATED, publish it manually in the Central Portal.' >> "$GITHUB_STEP_SUMMARY"
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}

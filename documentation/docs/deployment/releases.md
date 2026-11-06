@@ -4,7 +4,7 @@
 # Maven Central releases
 
 The GitHub `Release` workflow runs when a tag matching `release@*` is pushed.
-`release@1.2.3` publishes version `1.2.3`; `release@1.2.3-rc.1` publishes
+`release@1.2.3` prepares version `1.2.3`; `release@1.2.3-rc.1` prepares
 `1.2.3-rc.1`. Tags must contain three numeric components and an optional
 alphanumeric prerelease suffix. Snapshot versions are rejected.
 
@@ -20,7 +20,9 @@ values and format as ZeroEcho:
 The signing public key must be available to Maven Central's signature validator.
 The workflow uses Java 25, runs `clean check javadoc`, builds deployer CLI
 archives, stages signed publications, validates the complete bundle, and uploads
-it through the Central Publisher API with `publishingType=AUTOMATIC`.
+it through the Central Publisher API with `publishingType=USER_MANAGED`.
+Central validates the deployment, then waits for manual publication in the
+Central Portal. The workflow does not trigger publication.
 
 Only the 17 runtime middleware modules in `gradle/central-publications.txt`
 are published, using coordinates `org.egothor:<module-name>:<release-version>`.
@@ -60,10 +62,14 @@ incorrect coordinates and dependencies on unpublished J7M modules before upload.
 The GitHub run retains the Central bundle as an artifact and attaches it and the
 CLI distributions to a GitHub release with generated notes. Its step summary
 records the Central deployment UUID. Upload acceptance starts asynchronous
-Central validation and publication; it does not prove the version is already
-available. The release owner checks that deployment in the Central Portal before
-announcing availability. If Central validation fails, inspect its diagnostics
-before attempting another upload. Do not blindly rerun a successful upload.
+Central validation. The release owner opens the deployment in the Central Portal,
+waits for `VALIDATED`, reviews the contents and clicks **Publish** to release it.
+Until that manual action, the artifacts are not published to Maven Central.
+A GitHub release or a successful workflow run does not indicate Maven Central
+availability. After publishing, verify that the deployment reaches `PUBLISHED`
+before announcing availability. If Central validation fails, inspect its
+diagnostics before attempting another upload. Do not blindly rerun a successful
+upload.
 
 Before upload, revert the workflow/build changes to roll back this automation.
 After publication Maven Central versions are immutable: publish a corrected

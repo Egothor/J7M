@@ -64,17 +64,19 @@ class NetworkConsensusNodeIT {
 
     @Test void tenThousandConcurrentCommandsPartitionAndFullRestartPreserveAcknowledgements() throws Exception {
         try (Cluster cluster = new Cluster(directory, 3)) {
-            String leader = cluster.leader();
+            String initialLeader = cluster.leader();
+            var client = cluster.appendClient(initialLeader);
             List<CompletableFuture<History>> requests = new ArrayList<>();
             for (int i = 0; i < 10_000; i++) {
                 String id = "op" + i; long invoked = System.nanoTime();
-                requests.add(cluster.nodes.get(leader).ask("APPEND " + id + " 1")
+                requests.add(client.append(id, 1, Duration.ofSeconds(60))
                         .thenApply(position -> new History(id, invoked, System.nanoTime(), Long.parseLong(position))));
             }
             Set<Long> positions = new HashSet<>(); List<History> history = new ArrayList<>();
             for (var request : requests) { History operation = request.get(60, TimeUnit.SECONDS); assertTrue(positions.add(operation.index())); history.add(operation); }
             verifyAndRetainHistory(history);
             assertEquals(10_000, positions.size());
+            String leader = cluster.leader();
             assertTrue(Long.parseLong(cluster.call(leader, "READ")) >= Collections.max(positions));
             cluster.isolate(leader);
             String replacement = cluster.leaderExcept(leader);
@@ -217,13 +219,15 @@ class NetworkConsensusNodeIT {
 
     @Test void hundredThousandCommandsCompactionOfflineReplicaAndResumeRecoverIdenticalState() throws Exception {
         try (Cluster cluster = new Cluster(directory, 3)) {
-            String leader = cluster.leader(); String offline = List.of("a", "b", "c").stream().filter(id -> !id.equals(leader)).findFirst().orElseThrow();
+            String initialLeader = cluster.leader(); String offline = List.of("a", "b", "c").stream().filter(id -> !id.equals(initialLeader)).findFirst().orElseThrow();
             cluster.kill(offline);
+            var client = cluster.appendClient(initialLeader);
             for (int offset = 0; offset < 100_000; offset += 1000) {
                 List<CompletableFuture<String>> batch = new ArrayList<>();
-                for (int i = offset; i < offset + 1000; i++) batch.add(cluster.nodes.get(leader).ask("APPEND load" + i + " 1"));
+                for (int i = offset; i < offset + 1000; i++) batch.add(client.append("load" + i, 1, Duration.ofSeconds(60)));
                 for (var operation : batch) operation.get(60, TimeUnit.SECONDS);
             }
+            String leader = cluster.leader();
             cluster.call(leader, "READ"); String before = cluster.call(leader, "STATE");
             assertTrue(before.startsWith("100000,100000,"));
             cluster.call(leader, "SNAPSHOT");
@@ -291,6 +295,22 @@ class NetworkConsensusNodeIT {
         long deadline = System.nanoTime() + Duration.ofSeconds(seconds).toNanos();
         while (!condition.getAsBoolean()) { if (System.nanoTime() > deadline) fail("condition did not converge"); LockSupport.parkNanos(5_000_000); }
     }
+    static final class EndpointReservations implements AutoCloseable {
+        private final Map<String, ServerSocket> sockets = new LinkedHashMap<>();
+        EndpointReservations(List<String> ids) throws IOException {
+            try {
+                for (String id : ids) sockets.put(id, new ServerSocket(0));
+            } catch (IOException failure) { close(); throw failure; }
+        }
+        Map<String, Integer> ports() {
+            Map<String, Integer> result = new HashMap<>();
+            sockets.forEach((id, socket) -> result.put(id, socket.getLocalPort()));
+            return result;
+        }
+        @Override public void close() {
+            for (ServerSocket socket : sockets.values()) try { socket.close(); } catch (IOException ignored) { }
+        }
+    }
     static final class Cluster implements AutoCloseable {
         final Path directory;
         final Map<String, Child> nodes = new ConcurrentHashMap<>();
@@ -299,9 +319,15 @@ class NetworkConsensusNodeIT {
         final Set<String> isolated = ConcurrentHashMap.newKeySet();
         Cluster(Path directory, int count) throws Exception {
             this.directory = directory;
-            for (String id : List.of("a", "b", "c", "d", "e")) try (ServerSocket socket = new ServerSocket(0)) { ports.put(id, socket.getLocalPort()); }
-            for (String from : ports.keySet()) for (String to : ports.keySet()) if (!from.equals(to)) proxies.put(from + to, new Proxy(from, to, ports.get(to), isolated));
-            for (String id : List.of("a", "b", "c").subList(0, count)) start(id);
+            try {
+                // Keep backend ports reserved until every proxy listener is bound, so
+                // neither another backend nor a proxy can claim the same endpoint.
+                try (var endpoints = new EndpointReservations(List.of("a", "b", "c", "d", "e"))) {
+                    ports.putAll(endpoints.ports());
+                    for (String from : ports.keySet()) for (String to : ports.keySet()) if (!from.equals(to)) proxies.put(from + to, new Proxy(from, to, ports.get(to), isolated));
+                }
+                for (String id : List.of("a", "b", "c").subList(0, count)) start(id);
+            } catch (Exception failure) { close(); throw failure; }
         }
         void start(String id) throws Exception {
             String endpoints = ports.keySet().stream().sorted().map(peer -> peer + ":" + (peer.equals(id) ? ports.get(peer) : proxies.get(id + peer).server.getLocalPort())).reduce((a,b) -> a + "," + b).orElseThrow();
@@ -310,6 +336,32 @@ class NetworkConsensusNodeIT {
         void kill(String id) { Child child = nodes.remove(id); if (child != null) child.close(); }
         void isolate(String id) { isolated.add(id); proxies.values().forEach(Proxy::drop); }
         void heal() { isolated.clear(); }
+        ConsensusAppendClient appendClient(String initialLeader) {
+            return new ConsensusAppendClient(initialLeader,
+                    (node, command) -> nodes.get(node).ask(command), this::retryLeader);
+        }
+        private synchronized String retryLeader(String previous, long deadline) throws Exception {
+            while (System.nanoTime() < deadline) {
+                for (String id : nodes.keySet()) if (!isolated.contains(id)) {
+                    long remaining = deadline - System.nanoTime();
+                    if (remaining <= 0) throw new TimeoutException("leader routing deadline after " + previous);
+                    try {
+                        String status = nodes.get(id).ask("STATUS").get(remaining, TimeUnit.NANOSECONDS);
+                        if (status.split(",", -1)[0].equals(id)) {
+                            remaining = deadline - System.nanoTime();
+                            if (remaining <= 0) throw new TimeoutException("leader routing deadline after " + previous);
+                            nodes.get(id).ask("READ").get(remaining, TimeUnit.NANOSECONDS);
+                            return id;
+                        }
+                    } catch (ExecutionException transientStatus) {
+                        if (!(transientStatus.getCause() instanceof IOException)) throw transientStatus;
+                    }
+                }
+                LockSupport.parkNanos(Math.min(5_000_000, Math.max(0, deadline - System.nanoTime())));
+                if (Thread.interrupted()) throw new InterruptedException("leader routing interrupted");
+            }
+            throw new TimeoutException("leader routing deadline after " + previous);
+        }
         String call(String id, String command) throws Exception { return nodes.get(id).ask(command).get(25, TimeUnit.SECONDS); }
         String state(String id) { try { return call(id, "STATE"); } catch (Exception e) { return ""; } }
         String status(String id) { try { return call(id, "STATUS"); } catch (Exception e) { return ",0,0,0,0,,0"; } }
@@ -347,9 +399,25 @@ class NetworkConsensusNodeIT {
                     String[] parts = line.split(" ", 3); CompletableFuture<String> future = pending.remove(parts[0]);
                     if (future != null) { if (parts[1].equals("OK")) future.complete(parts.length == 3 ? parts[2] : ""); else future.completeExceptionally(new IOException(parts.length == 3 ? parts[2] : "error")); }
                 } } catch (IOException e) { ready.completeExceptionally(e); }
-                finally { pending.values().forEach(f -> f.completeExceptionally(new IOException("process stopped"))); }
+                finally {
+                    ready.completeExceptionally(new IOException("process stopped before READY"));
+                    pending.values().forEach(f -> f.completeExceptionally(new IOException("process stopped")));
+                }
             });
-            ready.get(10, TimeUnit.SECONDS);
+            try { ready.get(10, TimeUnit.SECONDS); }
+            catch (Exception failure) {
+                close();
+                if (failure instanceof InterruptedException) Thread.currentThread().interrupt();
+                throw new IOException("child " + id + " did not become ready: " + startupDiagnostic(path), failure);
+            }
+        }
+        private static String startupDiagnostic(Path path) {
+            try (InputStream stderr = Files.newInputStream(path.resolve("process.err"))) {
+                int limit = 16 * 1024;
+                byte[] bytes = stderr.readNBytes(limit + 1);
+                return new String(bytes, 0, Math.min(bytes.length, limit), java.nio.charset.StandardCharsets.UTF_8)
+                        + (bytes.length > limit ? "\n[stderr truncated]" : "");
+            } catch (IOException unreadable) { return "stderr unavailable: " + unreadable.getMessage(); }
         }
         CompletableFuture<String> ask(String command) {
             String id = Long.toString(sequence.incrementAndGet()); CompletableFuture<String> future = new CompletableFuture<>(); pending.put(id, future);

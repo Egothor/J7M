@@ -588,7 +588,10 @@ public final class NetworkConsensusNode implements AutoCloseable {
     private void requireLeader() throws IOException {
         checkOpen();
         if (!started || !leader) throw new IOException(leaderId.isEmpty() ? "UNAVAILABLE: no known leader" : "NOT_LEADER: " + leaderId);
-        if (System.nanoTime() - lastQuorumAt > config.electionTimeout().toNanos()) throw new IOException("UNAVAILABLE: quorum confirmation expired");
+        // A local vote does not expire with the heartbeat scheduler. During a joint
+        // change the local member must still form a majority of both configurations.
+        if (!quorum(Set.of(config.nodeId())) && System.nanoTime() - lastQuorumAt > config.electionTimeout().toNanos())
+            throw new IOException("UNAVAILABLE: quorum confirmation expired");
     }
     private void checkOpen() throws IOException { if (failed != null) throw failed; if (closed) throw new IOException("node closed"); }
     private void fail(IOException error) { failed = error; leader = false; mutex.notifyAll(); }
