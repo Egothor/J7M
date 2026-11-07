@@ -18,12 +18,48 @@ values and format as ZeroEcho:
 | `MAVEN_SIGNING_PASSWORD` | Passphrase for the signing key |
 
 The signing public key must be available to Maven Central's signature validator.
-The workflow uses Java 25, runs `clean check javadoc`, builds deployer CLI,
+The workflow uses Java 25, runs all tests and checks on three isolated runners,
+then validates Javadoc, builds deployer CLI,
 platform, starter and signed Hello example archives, validates an external consumer installation,
 stages signed publications, validates the complete bundle, and uploads
 it through the Central Publisher API with `publishingType=USER_MANAGED`.
 Central validates the deployment, then waits for manual publication in the
 Central Portal. The workflow does not trigger publication.
+
+## Test runners and release duration
+
+The validation job checks the tag, publishing credentials when needed, and
+release tooling before it starts the test matrix. All jobs check out the exact
+same commit SHA. The three test runners execute:
+
+| Runner | Gradle work |
+| --- | --- |
+| `distributed` | Distributed-core and integrations tests |
+| `applications` | Application-distributed and cluster-management tests |
+| `remaining` | Full `check`, excluding only those four exact `:module:test` tasks |
+
+The full check retains PMD and the other validation tasks for every module.
+Each ordinary test task runs on exactly one runner; consensus stays on the
+remaining runner. No test methods, counts, deadlines or per-runner test forks
+change. Each test runner starts with `clean` and disables Gradle's task-output
+cache so assigned tests really execute, including a local rehearsal with old
+build outputs. Dependency caching remains enabled. A failing matrix entry does
+not cancel the other entries, and each
+failed runner retains its own uniquely named test diagnostics.
+
+The release job starts only after all three entries succeed. It builds Javadoc,
+archives and checksums and runs the external consumer check on a fresh runner.
+It does not repeat `check` or run an unnecessary `clean` before building the
+artifacts. Signing and upload remain gated on that complete test result.
+
+Recent test XML durations total roughly 284 seconds for the distributed group,
+232 seconds for applications and 185 seconds for the remainder. Their sum is
+about 12 minutes of serial test time; separate runners put the longest group
+on the critical path instead. Allowing for setup and artifact work suggests
+roughly 5–8 minutes, but this is a planning estimate, not a measured GitHub run
+or a guarantee. Runner load, dependency downloads and storage affect the result.
+The tradeoff is more total runner minutes and repeated compilation across jobs.
+An already running workflow continues with its original definition.
 
 The 20 application-development and runtime modules in `gradle/central-publications.txt`
 are published, using coordinates `org.egothor:<module-name>:<release-version>`.
@@ -64,7 +100,7 @@ python3 tools/prepare_central_bundle.py --repository build/central-repository --
 ```
 
 The workflow also supports **Run workflow** with a `release_version` and
-`dry_run=true` (the default). Rehearsal runs the same clean build, all tests,
+`dry_run=true` (the default). Rehearsal runs the same test matrix, all checks,
 Javadoc, CLI/platform/starter packaging and the external consumer procedure.
 It requires no Maven Central signing key or Central credentials. The consumer
 check creates its own application-signing key in a temporary directory; that
@@ -80,11 +116,15 @@ correctly:
 ```bash
 DOCKER_HOST="unix://${XDG_RUNTIME_DIR}/podman/podman.sock" act workflow_dispatch \
   -W .github/workflows/release.yml -e /tmp/j7m-release-event.json \
+  --concurrent-jobs 1 \
   --artifact-server-path /tmp/j7m-release-artifacts
 ```
 
 Choose an `act` runner image with the workflow's required tools and keep the
-event, logs and artifacts outside the repository. A publishing dispatch
+event, logs and artifacts outside the repository. Run the jobs serially on one
+local host to avoid competing process-heavy suites in three containers. That
+checks workflow behavior but does not benchmark separate GitHub runners.
+A publishing dispatch
 (`dry_run=false`) must select the exact matching `release@VERSION` tag and
 requires the normal signing and Central credentials. Pushes of release tags
 always use the publishing path, which still requires manual **Publish** in the

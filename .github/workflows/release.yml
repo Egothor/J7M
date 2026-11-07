@@ -25,14 +25,17 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  release:
+  validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
-    permissions:
-      contents: write
+    timeout-minutes: 10
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      test_matrix: ${{ steps.plan.outputs.matrix }}
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ github.sha }}
           fetch-depth: 0
       - name: Validate release tag
         id: version
@@ -53,11 +56,6 @@ jobs:
           version=$(python3 tools/prepare_central_bundle.py --tag "$RELEASE_TAG")
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '25'
-      - uses: gradle/actions/setup-gradle@v4
       - name: Validate release configuration
         if: github.event_name == 'push' || !inputs.dry_run
         env:
@@ -70,15 +68,72 @@ jobs:
           test -n "$MAVEN_SIGNING_PASSWORD"
       - name: Test release tooling
         run: python3 -m unittest discover -s tools -p 'test_*.py'
-      - name: Build, test and validate Javadoc
+      - name: Plan isolated test runners
+        id: plan
+        run: |
+          matrix=$(python3 tools/release_test_plan.py)
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+
+  tests:
+    name: Tests (${{ matrix.shard }})
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.validate.outputs.test_matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Run assigned tests and checks
         env:
-          RELEASE_VERSION: ${{ steps.version.outputs.version }}
-        run: ./gradlew clean check javadoc :j7m-deployer-cli:distTar :j7m-deployer-cli:distZip releaseChecksums validateConsumerDistribution --no-daemon -PreleaseVersion="$RELEASE_VERSION"
+          RELEASE_VERSION: ${{ needs.validate.outputs.version }}
+          TEST_TASKS: ${{ matrix.tasks }}
+        run: |
+          read -r -a test_tasks <<< "$TEST_TASKS"
+          ./gradlew clean "${test_tasks[@]}" --no-build-cache --no-daemon -PreleaseVersion="$RELEASE_VERSION"
       - name: Retain failed test diagnostics
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: failed-test-diagnostics-${{ steps.version.outputs.version }}
+          name: failed-tests-${{ matrix.shard }}-${{ needs.validate.outputs.version }}-${{ github.run_attempt }}
+          path: |
+            **/build/test-results/test/**
+            **/build/reports/tests/test/**
+          if-no-files-found: ignore
+
+  release:
+    needs: [validate, tests]
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Validate Javadoc and build release artifacts
+        env:
+          RELEASE_VERSION: ${{ needs.validate.outputs.version }}
+        run: ./gradlew javadoc :j7m-deployer-cli:distTar :j7m-deployer-cli:distZip releaseChecksums validateConsumerDistribution --no-daemon -PreleaseVersion="$RELEASE_VERSION"
+      - name: Retain failed release diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: failed-release-diagnostics-${{ needs.validate.outputs.version }}-${{ github.run_attempt }}
           path: |
             **/build/test-results/test/**
             **/build/reports/tests/test/**
@@ -86,7 +141,7 @@ jobs:
       - name: Stage signed Maven publications
         if: github.event_name == 'push' || !inputs.dry_run
         env:
-          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+          RELEASE_VERSION: ${{ needs.validate.outputs.version }}
           MAVEN_SIGNING_KEY: ${{ secrets.MAVEN_SIGNING_KEY }}
           MAVEN_SIGNING_PASSWORD: ${{ secrets.MAVEN_SIGNING_PASSWORD }}
         run: |
@@ -95,7 +150,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: github.event_name == 'push' || !inputs.dry_run
         with:
-          name: central-bundle-${{ steps.version.outputs.version }}
+          name: central-bundle-${{ needs.validate.outputs.version }}
           path: build/central-bundle.zip
           if-no-files-found: error
       - name: Upload bundle for manual Maven Central publication
@@ -117,5 +172,5 @@ jobs:
         if: github.event_name == 'push' || !inputs.dry_run
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          RELEASE_TAG: ${{ needs.validate.outputs.tag }}
         run: gh release create "$RELEASE_TAG" build/central-bundle.zip build/distributions/j7m-starter-*.zip build/distributions/j7m-hello-*.zip build/distributions/SHA256SUMS j7m-deployer-cli/build/distributions/*.tar j7m-deployer-cli/build/distributions/*.tar.gz j7m-deployer-cli/build/distributions/*.zip --verify-tag --generate-notes
